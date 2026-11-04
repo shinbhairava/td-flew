@@ -53,8 +53,8 @@ CI builds every pull request and push to `main`.
 The workflow is [`.github/workflows/android.yml`](.github/workflows/android.yml). It:
 
 - runs `testDebugUnitTest` and `assembleDebug` on every pull request;
-- builds a release APK for `v*` tags and manual runs (signed when the signing secrets are configured);
-- uploads debug and release APKs as workflow artifacts;
+- builds a signed release APK on every workflow run;
+- uploads one `build` artifact containing the release APK;
 - publishes a GitHub Release for tags.
 
 ### Telegram API credentials
@@ -64,8 +64,8 @@ TD Flew needs Telegram `api_id` and `api_hash` values from
 
 | Secret | Value |
 | --- | --- |
-| `TELEGRAM_API_ID` | Your numeric Telegram API ID |
-| `TELEGRAM_API_HASH` | Your Telegram API hash |
+| `API_ID` | Your numeric Telegram API ID |
+| `API_HASH` | Your Telegram API hash |
 
 If they are absent, the build falls back to the public credentials used by the
 reference project. That fallback is only a convenience for trying the app. It can be

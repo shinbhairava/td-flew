@@ -8,8 +8,10 @@ plugins {
 
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
-val telegramApiId = env("TELEGRAM_API_ID")?.toIntOrNull() ?: 4
-val telegramApiHash = env("TELEGRAM_API_HASH") ?: "014b35b6184100b085b0d0572f9b5103"
+val telegramApiId = (env("API_ID") ?: env("TELEGRAM_API_ID"))?.toIntOrNull() ?: 4
+val telegramApiHash = env("API_HASH")
+    ?: env("TELEGRAM_API_HASH")
+    ?: "014b35b6184100b085b0d0572f9b5103"
 
 val appVersionName = env("APP_VERSION_NAME") ?: "1.0.0"
 val appVersionCode = env("APP_VERSION_CODE")?.toIntOrNull() ?: 1
