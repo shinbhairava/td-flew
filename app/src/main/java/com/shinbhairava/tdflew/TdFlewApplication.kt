@@ -5,6 +5,7 @@ import android.content.Context
 import com.shinbhairava.tdflew.data.SettingsStore
 import com.shinbhairava.tdflew.data.TransferStore
 import com.shinbhairava.tdflew.engine.TelegramManager
+import com.shinbhairava.tdflew.engine.AutoBackupScheduler
 
 class AppContainer(context: Context) {
     val settings = SettingsStore(context)
@@ -20,5 +21,6 @@ class TdFlewApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
         container.telegram.start()
+        AutoBackupScheduler.reschedule(this)
     }
 }

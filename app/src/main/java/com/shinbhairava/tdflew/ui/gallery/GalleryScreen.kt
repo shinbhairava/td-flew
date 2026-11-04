@@ -78,6 +78,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.shinbhairava.tdflew.data.TransferDirection
+import com.shinbhairava.tdflew.data.TransferStatus
 import com.shinbhairava.tdflew.drive.DriveItem
 import com.shinbhairava.tdflew.drive.DriveItemKind
 import com.shinbhairava.tdflew.drive.DriveSnapshot
@@ -93,6 +95,7 @@ import com.shinbhairava.tdflew.ui.components.TdImage
 import com.shinbhairava.tdflew.ui.components.TdVideo
 import com.shinbhairava.tdflew.ui.dayKey
 import com.shinbhairava.tdflew.ui.fileSubtitle
+import com.shinbhairava.tdflew.ui.formatBytes
 import com.shinbhairava.tdflew.ui.formatDateTime
 import com.shinbhairava.tdflew.ui.formatShortDate
 import com.shinbhairava.tdflew.ui.friendlyDayLabel
@@ -117,7 +120,8 @@ fun GalleryScreen(
     var uploadCount by remember { mutableIntStateOf(0) }
     var uploading by remember { mutableStateOf(false) }
     var actionBusy by remember { mutableStateOf<String?>(null) }
-    var uploadTags by rememberSaveable { mutableStateOf("") }
+    var editTagsItem by remember { mutableStateOf<DriveItem?>(null) }
+    var editTags by remember { mutableStateOf("") }
 
     LaunchedEffect(drive?.id, refreshToken) {
         val currentDrive = drive ?: return@LaunchedEffect
@@ -157,7 +161,6 @@ fun GalleryScreen(
                         // indexes image/video documents in Gallery and uses
                         // their Telegram thumbnails for previews.
                         asMedia = false,
-                        tags = uploadTags.split(Regex("[ ,]+")),
                     )
                     success += 1
                     uploadCount += 1
@@ -265,8 +268,6 @@ fun GalleryScreen(
                 preset = preset,
                 onPresetChange = { presetName = it.name },
                 resultCount = filtered.size,
-                tags = uploadTags,
-                onTagsChange = { uploadTags = it },
             )
 
             when {
@@ -355,6 +356,40 @@ fun GalleryScreen(
                 viewerItem = null
                 deleteTarget = selected
             },
+            onEditTags = { selected ->
+                editTagsItem = selected
+                editTags = selected.tags.joinToString(" ")
+            },
+        )
+    }
+
+    editTagsItem?.let { item ->
+        AlertDialog(
+            onDismissRequest = { editTagsItem = null },
+            title = { Text("Edit tags") },
+            text = {
+                OutlinedTextField(
+                    value = editTags,
+                    onValueChange = { editTags = it },
+                    label = { Text("Tags") },
+                    placeholder = { Text("car home tree") },
+                    supportingText = { Text("Separate tags with spaces or commas") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val selected = editTagsItem ?: return@Button
+                    editTagsItem = null
+                    scope.launch {
+                        runCatching { manager.updateTags(selected, editTags.split(Regex("[ ,]+"))) }
+                            .onSuccess { onMessage("Tags updated") }
+                            .onFailure { onMessage(friendlyError(it)) }
+                        refreshToken += 1
+                    }
+                }) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { editTagsItem = null }) { Text("Cancel") } },
         )
     }
 
@@ -417,8 +452,6 @@ private fun SearchAndFilters(
     preset: GalleryPreset,
     onPresetChange: (GalleryPreset) -> Unit,
     resultCount: Int,
-    tags: String,
-    onTagsChange: (String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -438,17 +471,6 @@ private fun SearchAndFilters(
             },
             singleLine = true,
             shape = CircleShape,
-        )
-        OutlinedTextField(
-            value = tags,
-            onValueChange = onTagsChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            placeholder = { Text("Tags for new uploads: car, home, tree") },
-            leadingIcon = { Icon(Icons.Outlined.Label, contentDescription = null) },
-            singleLine = true,
-            shape = MaterialTheme.shapes.large,
         )
         Row(
             modifier = Modifier
@@ -624,6 +646,7 @@ private fun MediaViewer(
     onOpen: (DriveItem) -> Unit,
     onShare: (DriveItem) -> Unit,
     onDelete: (DriveItem) -> Unit,
+    onEditTags: (DriveItem) -> Unit,
 ) {
     if (items.isEmpty()) return
     Dialog(
@@ -638,6 +661,12 @@ private fun MediaViewer(
             pageCount = { items.size },
         )
         val item = items[pagerState.currentPage]
+        val transfers by manager.transfers.records.collectAsStateWithLifecycle()
+        val transfer = transfers.firstOrNull {
+            it.direction == TransferDirection.DOWNLOAD &&
+                it.status == TransferStatus.RUNNING &&
+                (it.fileId == item.fileId || it.messageId == item.messageId)
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -711,6 +740,9 @@ private fun MediaViewer(
                 FilledTonalIconButton(onClick = { onDelete(item) }, enabled = actionBusy == null) {
                     Icon(Icons.Outlined.DeleteOutline, contentDescription = "Delete from Telegram")
                 }
+                FilledTonalIconButton(onClick = { onEditTags(item) }, enabled = actionBusy == null) {
+                    Icon(Icons.Outlined.Label, contentDescription = "Edit tags")
+                }
             }
 
             Surface(
@@ -736,6 +768,25 @@ private fun MediaViewer(
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.76f),
                     )
+                    if (item.tags.isNotEmpty()) {
+                        Text(
+                            text = item.tags.joinToString("  ") { "#$it" },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.8f),
+                        )
+                    }
+                    if (transfer != null) {
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(
+                            progress = { transfer.progress },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            text = "Downloaded ${formatBytes(transfer.bytesDone)} / ${formatBytes(transfer.bytesTotal)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.8f),
+                        )
+                    }
                     Spacer(Modifier.height(12.dp))
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

@@ -5,6 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +60,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -89,6 +93,7 @@ import com.shinbhairava.tdflew.engine.ConnectionStatus
 import com.shinbhairava.tdflew.engine.LogEntry
 import com.shinbhairava.tdflew.engine.LogLevel
 import com.shinbhairava.tdflew.engine.TelegramManager
+import com.shinbhairava.tdflew.engine.AutoBackupScheduler
 import com.shinbhairava.tdflew.engine.friendlyError
 import com.shinbhairava.tdflew.ui.components.ScreenHeader
 import com.shinbhairava.tdflew.ui.components.TdAvatar
@@ -124,6 +129,26 @@ fun MenuScreen(
     var showLicenses by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var signingOut by remember { mutableStateOf(false) }
+    var backupUris by remember { mutableStateOf(container.settings.backupUris()) }
+    var backupEnabled by remember { mutableStateOf(container.settings.backupEnabled()) }
+    var backupInterval by remember { mutableStateOf(container.settings.backupIntervalMinutes().toString()) }
+
+    val backupFolderPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            container.settings.addBackupUri(uri.toString())
+            backupUris = container.settings.backupUris()
+            AutoBackupScheduler.reschedule(context)
+            onMessage("Backup folder added")
+        }
+    }
 
     suspend fun refreshCacheSize() {
         cacheSize = runCatching { manager.cacheSize() }.getOrDefault(0L)
@@ -160,6 +185,76 @@ fun MenuScreen(
                     photoFileId = profile?.photoFileId,
                     connection = connection,
                 )
+            }
+
+            item {
+                MenuCard(
+                    icon = Icons.Outlined.CloudUpload,
+                    title = "Automatic backup",
+                    supporting = if (backupEnabled) {
+                        "${backupUris.size} folder(s) · every ${backupInterval} minutes"
+                    } else {
+                        "Select Android folders to back up to Telegram"
+                    },
+                ) {
+                    backupUris.forEach { raw ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = Uri.parse(raw).lastPathSegment?.substringAfterLast(':') ?: raw,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            TextButton(onClick = {
+                                container.settings.removeBackupUri(raw)
+                                backupUris = container.settings.backupUris()
+                                AutoBackupScheduler.reschedule(context)
+                            }) { Text("Remove") }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = backupEnabled,
+                            onCheckedChange = {
+                                backupEnabled = it
+                                container.settings.setBackupEnabled(it)
+                                AutoBackupScheduler.reschedule(context)
+                            },
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (backupEnabled) "Enabled" else "Disabled")
+                    }
+                    OutlinedTextField(
+                        value = backupInterval,
+                        onValueChange = { value ->
+                            backupInterval = value.filter(Char::isDigit)
+                            value.toLongOrNull()?.let {
+                                container.settings.setBackupIntervalMinutes(it)
+                                if (backupEnabled) AutoBackupScheduler.reschedule(context)
+                            }
+                        },
+                        label = { Text("Interval (minutes, minimum 15)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = { backupFolderPicker.launch(null) }) {
+                            Icon(Icons.Outlined.FolderShared, contentDescription = null)
+                            Spacer(Modifier.size(6.dp))
+                            Text("Add Android folder")
+                        }
+                        if (android.os.Build.VERSION.SDK_INT >= 31) {
+                            OutlinedButton(onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                }
+                            }) { Text("Alarm permission") }
+                        }
+                    }
+                }
             }
 
             item {

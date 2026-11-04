@@ -140,7 +140,7 @@ fun friendlyError(error: Throwable): String {
 class TelegramManager(
     private val context: Context,
     private val settings: SettingsStore,
-    private val transfers: TransferStore,
+    val transfers: TransferStore,
 ) : Client.ResultHandler {
 
     companion object {
@@ -924,6 +924,34 @@ class TelegramManager(
         invalidateSnapshot()
         log("Deleted ${ids.size} item(s) from ${drive.title}")
         return ids.size
+    }
+
+    suspend fun updateTags(item: DriveItem, tags: Collection<String>) {
+        val drive = _driveChat.value ?: throw IllegalStateException("Choose a Telegram drive first.")
+        val clean = tags.mapNotNull { it.trim().lowercase().takeIf(String::isNotBlank) }.distinct().take(20)
+        val parts = if (item.chunkParts.isEmpty()) {
+            listOf(item.messageId to item.chunkIndex)
+        } else {
+            item.chunkParts.map { it.messageId to it.index }
+        }
+        parts.forEach { (messageId, index) ->
+            val marker = if (item.chunkGroup == null) {
+                DriveMetadata.encodeFile(item.path)
+            } else {
+                DriveMetadata.encodeChunk(item.path, item.chunkGroup, index, item.chunkTotal)
+            }
+            request<TdApi.Message>(
+                TdApi.EditMessageCaption(
+                    drive.id,
+                    messageId,
+                    null,
+                    TdApi.FormattedText(DriveMetadata.withTags(marker, clean), emptyArray()),
+                    false,
+                ),
+            )
+        }
+        invalidateSnapshot()
+        log("Updated tags for ${item.name}")
     }
 
     // ---------------------------------------------------------------------
