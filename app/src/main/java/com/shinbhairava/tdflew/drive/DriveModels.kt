@@ -30,10 +30,21 @@ data class DriveItem(
     val thumbnailFileId: Int? = null,
     val durationSeconds: Int = 0,
     val isManaged: Boolean = true,
+    val chunkGroup: String? = null,
+    val chunkIndex: Int = 0,
+    val chunkTotal: Int = 0,
+    val chunkParts: List<DriveChunkPart> = emptyList(),
 ) {
     val isFolder: Boolean
         get() = kind == DriveItemKind.FOLDER
 }
+
+data class DriveChunkPart(
+    val messageId: Long,
+    val fileId: Int,
+    val size: Long,
+    val index: Int,
+)
 
 data class DriveSnapshot(
     val folders: List<DriveItem>,

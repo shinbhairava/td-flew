@@ -14,12 +14,20 @@ import java.util.Base64
 object DriveMetadata {
     private const val FILE_PREFIX = "TDFLEW1:F:"
     private const val FOLDER_PREFIX = "TDFLEW1:D:"
+    private const val CHUNK_PREFIX = "TDFLEW1:C:"
     const val MAX_PATH_LENGTH = 480
     const val MAX_NAME_LENGTH = 96
     const val MAX_PATH_BYTES = 720
 
     private val encoder: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder: Base64.Decoder = Base64.getUrlDecoder()
+
+    data class Chunk(
+        val path: String,
+        val group: String,
+        val index: Int,
+        val total: Int,
+    )
 
     fun encodeFile(path: String): String {
         val normalized = normalizeFilePath(path)
@@ -33,11 +41,34 @@ object DriveMetadata {
         return FOLDER_PREFIX + encoder.encodeToString(normalized.toByteArray(StandardCharsets.UTF_8))
     }
 
+    fun encodeChunk(path: String, group: String, index: Int, total: Int): String {
+        val normalized = normalizeFilePath(path)
+            ?: throw IllegalArgumentException("Invalid file path")
+        require(group.isNotBlank() && index in 0 until total && total > 1)
+        return "$CHUNK_PREFIX${encoder.encodeToString(normalized.toByteArray(StandardCharsets.UTF_8))}:$group:$index:$total"
+    }
+
     fun parseFilePath(caption: String): String? = decodeMarker(caption, FILE_PREFIX)
         ?.let(::normalizeFilePath)
 
     fun parseFolderPath(caption: String): String? = decodeMarker(caption, FOLDER_PREFIX)
         ?.let(::normalizeFolderPath)
+
+    fun parseChunk(caption: String): Chunk? {
+        val fields = caption.trim().removePrefix(CHUNK_PREFIX)
+            .takeIf { caption.trim().startsWith(CHUNK_PREFIX) }
+            ?.split(':') ?: return null
+        if (fields.size != 4) return null
+        val path = try {
+            String(decoder.decode(fields[0]), StandardCharsets.UTF_8)
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
+        val index = fields[2].toIntOrNull() ?: return null
+        val total = fields[3].toIntOrNull() ?: return null
+        return Chunk(normalizeFilePath(path) ?: return null, fields[1], index, total)
+            .takeIf { it.total > 1 && it.index in 0 until it.total && it.group.isNotBlank() }
+    }
 
     fun normalizeFolderPath(raw: String): String? {
         val normalized = normalizeRawPath(raw) ?: return null

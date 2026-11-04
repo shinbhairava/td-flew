@@ -147,7 +147,11 @@ fun GalleryScreen(
                     manager.upload(
                         uri = uri,
                         folderPath = "/",
-                        asMedia = true,
+                        // Send the original as a Telegram document rather than
+                        // compressing it into photo/video media. TD Flew still
+                        // indexes image/video documents in Gallery and uses
+                        // their Telegram thumbnails for previews.
+                        asMedia = false,
                     )
                     success += 1
                     uploadCount += 1

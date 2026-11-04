@@ -14,6 +14,7 @@ import com.shinbhairava.tdflew.data.SettingsStore
 import com.shinbhairava.tdflew.data.TransferStore
 import com.shinbhairava.tdflew.data.TransferStatus
 import com.shinbhairava.tdflew.drive.DriveChat
+import com.shinbhairava.tdflew.drive.DriveChunkPart
 import com.shinbhairava.tdflew.drive.DriveItem
 import com.shinbhairava.tdflew.drive.DriveItemKind
 import com.shinbhairava.tdflew.drive.DriveMetadata
@@ -37,7 +38,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
@@ -144,6 +148,7 @@ class TelegramManager(
         private const val MAX_HISTORY = 5_000
         private const val MAX_LOGS = 400
         private const val FILE_TIMEOUT_MS = 30 * 60 * 1000L
+        private const val MAX_PART_BYTES = 1_900_000_000L
         private const val SEND_TIMEOUT_MS = 30 * 60 * 1000L
         private const val MAX_RECENT_SEND_OUTCOMES = 32
         private val nativeLoaded: Boolean = runCatching {
@@ -699,8 +704,8 @@ class TelegramManager(
 
             val snapshot = DriveSnapshot(
                 folders = folders.distinctBy { it.id }.sortedByDescending { it.timestamp },
-                files = files.distinctBy { it.id }.sortedByDescending { it.timestamp },
-                media = media.distinctBy { it.id }.sortedByDescending { it.timestamp },
+                files = collapseChunks(files).sortedByDescending { it.timestamp },
+                media = collapseChunks(media).sortedByDescending { it.timestamp },
                 scannedMessages = scanned,
                 truncated = truncated,
             )
@@ -715,6 +720,25 @@ class TelegramManager(
 
     fun invalidateSnapshot() {
         cachedSnapshot = null
+    }
+
+    private fun collapseChunks(items: List<DriveItem>): List<DriveItem> {
+        val result = mutableListOf<DriveItem>()
+        items.filter { it.chunkGroup == null }.forEach { item ->
+            if (result.none { it.id == item.id }) result += item
+        }
+        items.filter { it.chunkGroup != null }
+            .groupBy { it.chunkGroup }
+            .values
+            .forEach { parts ->
+                val ordered = parts.sortedBy { it.chunkIndex }
+                val first = ordered.firstOrNull() ?: return@forEach
+                result += first.copy(
+                    size = ordered.sumOf { it.size },
+                    chunkParts = ordered.flatMap { it.chunkParts },
+                )
+            }
+        return result.distinctBy { it.id }
     }
 
     private fun parseMessage(message: TdApi.Message): DriveItem? {
@@ -738,26 +762,41 @@ class TelegramManager(
 
             is TdApi.MessageDocument -> {
                 val document = content.document
-                val markerPath = DriveMetadata.parseFilePath(content.caption.text)
+                val chunk = DriveMetadata.parseChunk(content.caption.text)
+                val markerPath = chunk?.path ?: DriveMetadata.parseFilePath(content.caption.text)
                 val fallbackName = DriveMetadata.sanitizeName(document.fileName)
                     ?: "File_${message.id}"
                 val path = markerPath ?: "/$fallbackName"
                 val file = document.document
+                val mimeType = document.mimeType.ifBlank {
+                    MediaTools.guessMimeType(fallbackName)
+                }
+                val kind = when {
+                    mimeType.startsWith("image/") -> DriveItemKind.PHOTO
+                    mimeType.startsWith("video/") -> DriveItemKind.VIDEO
+                    else -> DriveItemKind.FILE
+                }
                 DriveItem(
                     id = "m${message.id}",
                     messageId = message.id,
                     path = path,
                     parentPath = DriveMetadata.parentOf(path),
                     name = DriveMetadata.nameOf(path).ifBlank { fallbackName },
-                    kind = DriveItemKind.FILE,
+                    kind = kind,
                     size = file.size.takeIf { it > 0L } ?: file.expectedSize.coerceAtLeast(0L),
                     timestamp = timestamp,
-                    mimeType = document.mimeType.ifBlank {
-                        MediaTools.guessMimeType(fallbackName)
-                    },
+                    mimeType = mimeType,
                     fileId = file.id,
                     thumbnailFileId = document.thumbnail?.file?.id,
                     isManaged = markerPath != null,
+                    chunkGroup = chunk?.group,
+                    chunkIndex = chunk?.index ?: 0,
+                    chunkTotal = chunk?.total ?: 0,
+                    chunkParts = if (chunk != null) {
+                        listOf(DriveChunkPart(message.id, file.id, file.size, chunk.index))
+                    } else {
+                        emptyList()
+                    },
                 )
             }
 
@@ -865,7 +904,10 @@ class TelegramManager(
         } else {
             listOf(item)
         }
-        val ids = targets.map { it.messageId }.distinct()
+        val ids = targets.flatMap { item ->
+            if (item.chunkParts.isEmpty()) listOf(item.messageId)
+            else item.chunkParts.map { it.messageId }
+        }.distinct()
         if (ids.isEmpty()) return 0
 
         ids.chunked(100).forEach { chunk ->
@@ -909,38 +951,93 @@ class TelegramManager(
             .mapTo(HashSet()) { it.path }
         val path = uniqueFilePath(parent, staged.name, paths)
         val transferId = transfers.addUpload(staged.name, staged.mimeType, staged.size)
-        uploadsByPath[staged.file.absolutePath] = transferId
-
         return try {
-            val caption = TdApi.FormattedText(DriveMetadata.encodeFile(path), emptyArray())
-            val content = buildMessageContent(staged, asMedia, caption)
-            val message = request<TdApi.Message>(
-                TdApi.SendMessage(
+            val group = if (staged.size > MAX_PART_BYTES) UUID.randomUUID().toString().replace("-", "") else null
+            val parts = splitForUpload(staged)
+            val sentMessages = parts.mapIndexed { index, part ->
+                val marker = if (group == null) {
+                    DriveMetadata.encodeFile(path)
+                } else {
+                    DriveMetadata.encodeChunk(path, group, index, parts.size)
+                }
+                val sent = sendStaged(
                     drive.id,
-                    null,
-                    null,
-                    null,
-                    null,
-                    content,
-                ),
-            )
-            val sent = awaitMessageSent(message)
-            val fileId = primaryFileId(sent)
+                    part,
+                    asMedia = group == null && asMedia,
+                    marker = marker,
+                    transferId = transferId,
+                )
+                if (part.file != staged.file) part.file.delete()
+                sent
+            }
             staged.file.delete()
-            transfers.completeUpload(transferId, fileId)
+            transfers.completeUpload(transferId, primaryFileId(sentMessages.last()))
             invalidateSnapshot()
             log(
                 "Uploaded ${staged.name} (${formatSize(staged.size)}) to $path" +
-                    if (asMedia) " as media" else "",
+                    if (group != null) " in ${parts.size} parts" else if (asMedia) " as media" else "",
             )
-            sent.id
+            sentMessages.first().id
         } catch (error: Throwable) {
             val message = friendlyError(error)
             transfers.failUpload(transferId, message)
             log("Upload failed for ${staged.name}: $message", LogLevel.ERROR)
             throw error
+        }
+    }
+
+    private suspend fun sendStaged(
+        chatId: Long,
+        staged: StagedUpload,
+        asMedia: Boolean,
+        marker: String,
+        transferId: String,
+    ): TdApi.Message {
+        uploadsByPath[staged.file.absolutePath] = transferId
+        return try {
+            val content = buildMessageContent(
+                staged,
+                asMedia,
+                TdApi.FormattedText(marker, emptyArray()),
+            )
+            val message = request<TdApi.Message>(
+                TdApi.SendMessage(chatId, null, null, null, null, content),
+            )
+            awaitMessageSent(message)
         } finally {
             uploadsByPath.remove(staged.file.absolutePath)
+        }
+    }
+
+    private suspend fun splitForUpload(staged: StagedUpload): List<StagedUpload> {
+        if (staged.size <= MAX_PART_BYTES) return listOf(staged)
+        return withContext(Dispatchers.IO) {
+            val parts = mutableListOf<StagedUpload>()
+            FileInputStream(staged.file).use { input ->
+                var index = 0
+                val buffer = ByteArray(1024 * 1024)
+                var remaining = staged.size
+                while (remaining > 0L) {
+                    val partFile = File(staged.file.parentFile, "${staged.file.name}.part$index")
+                    FileOutputStream(partFile).use { output ->
+                        var written = 0L
+                        while (written < MAX_PART_BYTES && remaining > 0L) {
+                            val read = input.read(buffer, 0, minOf(buffer.size.toLong(), MAX_PART_BYTES - written).toInt())
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                            written += read
+                            remaining -= read
+                        }
+                    }
+                    if (partFile.length() == 0L) {
+                        partFile.delete()
+                        break
+                    }
+                    parts += staged.copy(file = partFile, size = partFile.length())
+                    index += 1
+                }
+            }
+            parts
         }
     }
 
@@ -1189,12 +1286,36 @@ class TelegramManager(
             bytesTotal = item.size,
         )
         return try {
-            val file = fetchFile(fileId)
-            val path = file.local.path
-            if (path.isBlank() || !File(path).exists()) {
-                error("Telegram did not return a local copy of this file.")
+            val saved = if (item.chunkParts.isEmpty()) {
+                val file = fetchFile(fileId)
+                val path = file.local.path
+                if (path.isBlank() || !File(path).exists()) {
+                    error("Telegram did not return a local copy of this file.")
+                }
+                FileSaver.save(context, File(path), item.name, item.mimeType)
+            } else {
+                val parts = item.chunkParts.sortedBy { it.index }
+                require(parts.size == item.chunkTotal) {
+                    "Some parts of ${item.name} are missing from Telegram."
+                }
+                val merged = withContext(Dispatchers.IO) {
+                    val output = File(context.cacheDir, "${UUID.randomUUID()}-${item.name}")
+                    FileOutputStream(output).use { out ->
+                        parts.forEach { part ->
+                            val fetched = fetchFile(part.fileId)
+                            val source = File(fetched.local.path)
+                            require(source.isFile) { "Telegram did not return a local copy of a file part." }
+                            FileInputStream(source).use { input -> input.copyTo(out) }
+                        }
+                    }
+                    output
+                }
+                try {
+                    FileSaver.save(context, merged, item.name, item.mimeType)
+                } finally {
+                    merged.delete()
+                }
             }
-            val saved = FileSaver.save(context, File(path), item.name, item.mimeType)
             transfers.completeByFileId(fileId, saved.uri, saved.displayPath)
             log("Saved ${item.name} to ${saved.displayPath}")
             saved
