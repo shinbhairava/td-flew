@@ -6,6 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
@@ -87,6 +90,7 @@ import com.shinbhairava.tdflew.ui.components.EmptyState
 import com.shinbhairava.tdflew.ui.components.LoadingState
 import com.shinbhairava.tdflew.ui.components.ScreenHeader
 import com.shinbhairava.tdflew.ui.components.TdImage
+import com.shinbhairava.tdflew.ui.components.TdVideo
 import com.shinbhairava.tdflew.ui.dayKey
 import com.shinbhairava.tdflew.ui.fileSubtitle
 import com.shinbhairava.tdflew.ui.formatDateTime
@@ -113,6 +117,7 @@ fun GalleryScreen(
     var uploadCount by remember { mutableIntStateOf(0) }
     var uploading by remember { mutableStateOf(false) }
     var actionBusy by remember { mutableStateOf<String?>(null) }
+    var uploadTags by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(drive?.id, refreshToken) {
         val currentDrive = drive ?: return@LaunchedEffect
@@ -152,6 +157,7 @@ fun GalleryScreen(
                         // indexes image/video documents in Gallery and uses
                         // their Telegram thumbnails for previews.
                         asMedia = false,
+                        tags = uploadTags.split(Regex("[ ,]+")),
                     )
                     success += 1
                     uploadCount += 1
@@ -259,6 +265,8 @@ fun GalleryScreen(
                 preset = preset,
                 onPresetChange = { presetName = it.name },
                 resultCount = filtered.size,
+                tags = uploadTags,
+                onTagsChange = { uploadTags = it },
             )
 
             when {
@@ -335,16 +343,17 @@ fun GalleryScreen(
 
     viewerItem?.let { item ->
         MediaViewer(
-            item = item,
+            items = filtered,
+            initialPage = filtered.indexOfFirst { it.id == item.id }.coerceAtLeast(0),
             manager = manager,
             actionBusy = actionBusy,
             onClose = { if (actionBusy == null) viewerItem = null },
-            onSave = { saveItem(item) },
-            onOpen = { openItem(item) },
-            onShare = { shareItem(item) },
-            onDelete = {
+            onSave = { saveItem(it) },
+            onOpen = { openItem(it) },
+            onShare = { shareItem(it) },
+            onDelete = { selected ->
                 viewerItem = null
-                deleteTarget = item
+                deleteTarget = selected
             },
         )
     }
@@ -408,6 +417,8 @@ private fun SearchAndFilters(
     preset: GalleryPreset,
     onPresetChange: (GalleryPreset) -> Unit,
     resultCount: Int,
+    tags: String,
+    onTagsChange: (String) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -427,6 +438,17 @@ private fun SearchAndFilters(
             },
             singleLine = true,
             shape = CircleShape,
+        )
+        OutlinedTextField(
+            value = tags,
+            onValueChange = onTagsChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            placeholder = { Text("Tags for new uploads: car, home, tree") },
+            leadingIcon = { Icon(Icons.Outlined.Label, contentDescription = null) },
+            singleLine = true,
+            shape = MaterialTheme.shapes.large,
         )
         Row(
             modifier = Modifier
@@ -593,15 +615,17 @@ private fun MediaTile(
 
 @Composable
 private fun MediaViewer(
-    item: DriveItem,
+    items: List<DriveItem>,
+    initialPage: Int,
     manager: TelegramManager,
     actionBusy: String?,
     onClose: () -> Unit,
-    onSave: () -> Unit,
-    onOpen: () -> Unit,
-    onShare: () -> Unit,
-    onDelete: () -> Unit,
+    onSave: (DriveItem) -> Unit,
+    onOpen: (DriveItem) -> Unit,
+    onShare: (DriveItem) -> Unit,
+    onDelete: (DriveItem) -> Unit,
 ) {
+    if (items.isEmpty()) return
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(
@@ -609,24 +633,40 @@ private fun MediaViewer(
             decorFitsSystemWindows = false,
         ),
     ) {
+        val pagerState = rememberPagerState(
+            initialPage = initialPage.coerceIn(0, items.lastIndex),
+            pageCount = { items.size },
+        )
+        val item = items[pagerState.currentPage]
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black),
         ) {
-            TdImage(
-                manager = manager,
-                fileId = if (item.kind == DriveItemKind.PHOTO) item.fileId else item.thumbnailFileId,
-                contentDescription = item.name,
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit,
-                placeholderIcon = if (item.kind == DriveItemKind.VIDEO) {
-                    Icons.Outlined.Videocam
+            ) { page ->
+                val pageItem = items[page]
+                if (pageItem.kind == DriveItemKind.VIDEO) {
+                    TdVideo(
+                        manager = manager,
+                        fileId = pageItem.fileId,
+                        contentDescription = pageItem.name,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
-                    Icons.Outlined.Image
-                },
-                priority = 1,
-            )
+                    TdImage(
+                        manager = manager,
+                        fileId = pageItem.fileId ?: pageItem.thumbnailFileId,
+                        contentDescription = pageItem.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        placeholderIcon = Icons.Outlined.Image,
+                        priority = 1,
+                    )
+                }
+            }
 
             if (item.kind == DriveItemKind.VIDEO) {
                 Surface(
@@ -643,7 +683,7 @@ private fun MediaViewer(
                             tint = Color.White,
                             modifier = Modifier
                                 .size(52.dp)
-                                .clickable(onClick = onOpen),
+                            .clickable { onOpen(item) },
                         )
                     }
                 }
@@ -662,13 +702,13 @@ private fun MediaViewer(
                     Icon(Icons.Outlined.Clear, contentDescription = "Close")
                 }
                 Spacer(Modifier.weight(1f))
-                FilledTonalIconButton(onClick = onSave, enabled = actionBusy == null) {
+                FilledTonalIconButton(onClick = { onSave(item) }, enabled = actionBusy == null) {
                     Icon(Icons.Outlined.Download, contentDescription = "Save to Downloads")
                 }
-                FilledTonalIconButton(onClick = onShare, enabled = actionBusy == null) {
+                FilledTonalIconButton(onClick = { onShare(item) }, enabled = actionBusy == null) {
                     Icon(Icons.Outlined.Share, contentDescription = "Share")
                 }
-                FilledTonalIconButton(onClick = onDelete, enabled = actionBusy == null) {
+                FilledTonalIconButton(onClick = { onDelete(item) }, enabled = actionBusy == null) {
                     Icon(Icons.Outlined.DeleteOutline, contentDescription = "Delete from Telegram")
                 }
             }
@@ -702,7 +742,7 @@ private fun MediaViewer(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (item.kind == DriveItemKind.VIDEO) {
-                            TextButton(onClick = onOpen, enabled = actionBusy == null) {
+                            TextButton(onClick = { onOpen(item) }, enabled = actionBusy == null) {
                                 Icon(
                                     Icons.Outlined.OpenInNew,
                                     contentDescription = null,
@@ -712,7 +752,7 @@ private fun MediaViewer(
                                 Text("Play video", color = Color.White)
                             }
                         }
-                        TextButton(onClick = onSave, enabled = actionBusy == null) {
+                        TextButton(onClick = { onSave(item) }, enabled = actionBusy == null) {
                             Icon(
                                 Icons.Outlined.Download,
                                 contentDescription = null,

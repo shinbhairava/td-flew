@@ -34,6 +34,7 @@ data class DriveItem(
     val chunkIndex: Int = 0,
     val chunkTotal: Int = 0,
     val chunkParts: List<DriveChunkPart> = emptyList(),
+    val tags: List<String> = emptyList(),
 ) {
     val isFolder: Boolean
         get() = kind == DriveItemKind.FOLDER

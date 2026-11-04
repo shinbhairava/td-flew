@@ -6,6 +6,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeParseException
 import java.time.temporal.TemporalAdjusters
+import java.time.ZoneId
 
 enum class GalleryPreset(val label: String) {
     ALL("All dates"),
@@ -130,6 +131,18 @@ data class GalleryQuery(
     }
 }
 
+fun galleryTimestampFromName(name: String, fallback: Long): Long {
+    val match = Regex("(?<!\\d)(\\d{4})[-_](\\d{2})[-_](\\d{2})(?!\\d)|(?<!\\d)(\\d{4})(\\d{2})(\\d{2})(?!\\d)")
+        .find(name) ?: return fallback
+    val groups = match.groupValues
+    val year = (groups[1].ifBlank { groups[4] }).toIntOrNull() ?: return fallback
+    val month = (groups[2].ifBlank { groups[5] }).toIntOrNull() ?: return fallback
+    val day = (groups[3].ifBlank { groups[6] }).toIntOrNull() ?: return fallback
+    return runCatching {
+        LocalDate.of(year, month, day).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }.getOrDefault(fallback)
+}
+
 data class DateRange(
     val start: LocalDate,
     val endExclusive: LocalDate,
@@ -196,7 +209,7 @@ fun filterGallery(
         }
         .filter { item ->
             if (terms.isEmpty()) return@filter true
-            val haystack = "${item.name} ${item.path}".lowercase()
+            val haystack = "${item.name} ${item.path} ${item.tags.joinToString(" ")}".lowercase()
             terms.all { haystack.contains(it) }
         }
         .sortedByDescending { it.timestamp }

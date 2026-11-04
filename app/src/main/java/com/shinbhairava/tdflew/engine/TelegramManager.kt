@@ -399,7 +399,7 @@ class TelegramManager(
                     Locale.getDefault().language.takeIf { it.isNotBlank() } ?: "en",
                     Build.MODEL.ifBlank { "Android" },
                     "Android ${Build.VERSION.RELEASE}",
-                    "TD Flew ${BuildConfig.VERSION_NAME}",
+                     "TD Flew ${BuildConfig.VERSION_NAME} - TDLib ${BuildConfig.TDLIB_VERSION}",
                 ),
             )
             log("TDLib parameters configured")
@@ -764,6 +764,7 @@ class TelegramManager(
                 val document = content.document
                 val chunk = DriveMetadata.parseChunk(content.caption.text)
                 val markerPath = chunk?.path ?: DriveMetadata.parseFilePath(content.caption.text)
+                val tags = DriveMetadata.parseTags(content.caption.text)
                 val fallbackName = DriveMetadata.sanitizeName(document.fileName)
                     ?: "File_${message.id}"
                 val path = markerPath ?: "/$fallbackName"
@@ -784,7 +785,7 @@ class TelegramManager(
                     name = DriveMetadata.nameOf(path).ifBlank { fallbackName },
                     kind = kind,
                     size = file.size.takeIf { it > 0L } ?: file.expectedSize.coerceAtLeast(0L),
-                    timestamp = timestamp,
+                    timestamp = galleryTimestampFromName(fallbackName, timestamp),
                     mimeType = mimeType,
                     fileId = file.id,
                     thumbnailFileId = document.thumbnail?.file?.id,
@@ -797,6 +798,7 @@ class TelegramManager(
                     } else {
                         emptyList()
                     },
+                    tags = tags,
                 )
             }
 
@@ -805,6 +807,7 @@ class TelegramManager(
                 val full = sizes.maxByOrNull { it.width.toLong() * it.height.toLong() } ?: return null
                 val preview = sizes.minByOrNull { it.width.toLong() * it.height.toLong() } ?: full
                 val markerPath = DriveMetadata.parseFilePath(content.caption.text)
+                val tags = DriveMetadata.parseTags(content.caption.text)
                 val fallbackName = "Photo_${message.id}.jpg"
                 val path = markerPath ?: "/$fallbackName"
                 DriveItem(
@@ -815,17 +818,19 @@ class TelegramManager(
                     name = DriveMetadata.nameOf(path).ifBlank { fallbackName },
                     kind = DriveItemKind.PHOTO,
                     size = full.photo.size.takeIf { it > 0L } ?: full.photo.expectedSize.coerceAtLeast(0L),
-                    timestamp = timestamp,
+                    timestamp = galleryTimestampFromName(fallbackName, timestamp),
                     mimeType = "image/jpeg",
                     fileId = full.photo.id,
                     thumbnailFileId = preview.photo.id,
                     isManaged = markerPath != null,
+                    tags = tags,
                 )
             }
 
             is TdApi.MessageVideo -> {
                 val video = content.video.video
                 val markerPath = DriveMetadata.parseFilePath(content.caption.text)
+                val tags = DriveMetadata.parseTags(content.caption.text)
                 val fallbackName = DriveMetadata.sanitizeName(content.video.fileName)
                     ?: "Video_${message.id}.mp4"
                 val path = markerPath ?: "/$fallbackName"
@@ -837,7 +842,7 @@ class TelegramManager(
                     name = DriveMetadata.nameOf(path).ifBlank { fallbackName },
                     kind = DriveItemKind.VIDEO,
                     size = video.size.takeIf { it > 0L } ?: video.expectedSize.coerceAtLeast(0L),
-                    timestamp = timestamp,
+                    timestamp = galleryTimestampFromName(fallbackName, timestamp),
                     mimeType = content.video.mimeType.ifBlank {
                         MediaTools.guessMimeType(fallbackName, "video/mp4")
                     },
@@ -845,6 +850,7 @@ class TelegramManager(
                     thumbnailFileId = content.video.thumbnail?.file?.id,
                     durationSeconds = content.video.duration.coerceAtLeast(0),
                     isManaged = markerPath != null,
+                    tags = tags,
                 )
             }
 
@@ -937,6 +943,7 @@ class TelegramManager(
         asMedia: Boolean,
         preferredName: String? = null,
         preferredMimeType: String? = null,
+        tags: Collection<String> = emptyList(),
     ): Long {
         val drive = _driveChat.value ?: throw IllegalStateException("Choose a Telegram drive first.")
         val parent = DriveMetadata.normalizeFolderPath(folderPath)
@@ -956,9 +963,9 @@ class TelegramManager(
             val parts = splitForUpload(staged)
             val sentMessages = parts.mapIndexed { index, part ->
                 val marker = if (group == null) {
-                    DriveMetadata.encodeFile(path)
+                    DriveMetadata.withTags(DriveMetadata.encodeFile(path), tags)
                 } else {
-                    DriveMetadata.encodeChunk(path, group, index, parts.size)
+                    DriveMetadata.withTags(DriveMetadata.encodeChunk(path, group, index, parts.size), tags)
                 }
                 val sent = sendStaged(
                     drive.id,
@@ -1402,7 +1409,7 @@ class TelegramManager(
     }
 
     private fun handleFileUpdate(file: TdApi.File) {
-        if (file.local.isDownloadingCompleted && file.local.path.isNotBlank()) {
+        if (file.local.path.isNotBlank()) {
             _filePaths.update { paths ->
                 val updated = paths + (file.id to file.local.path)
                 if (updated.size <= 1_000) updated else updated.entries
@@ -1410,7 +1417,7 @@ class TelegramManager(
                     .takeLast(750)
                     .associate { it.key to it.value }
             }
-            completeFileWaiters(file)
+            if (file.local.isDownloadingCompleted) completeFileWaiters(file)
         }
 
         transfers.updateProgressByFileId(

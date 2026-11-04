@@ -27,6 +27,7 @@ jobs:
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       API_ID: ${{ secrets.API_ID }}
       API_HASH: ${{ secrets.API_HASH }}
+      TDLIB_VERSION: "a82128a"
       APP_VERSION_CODE: ${{ github.run_number }}
       RAW_VERSION_NAME: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
 

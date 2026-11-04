@@ -15,6 +15,7 @@ object DriveMetadata {
     private const val FILE_PREFIX = "TDFLEW1:F:"
     private const val FOLDER_PREFIX = "TDFLEW1:D:"
     private const val CHUNK_PREFIX = "TDFLEW1:C:"
+    private const val TAG_PREFIX = "TDFLEW1:T:"
     const val MAX_PATH_LENGTH = 480
     const val MAX_NAME_LENGTH = 96
     const val MAX_PATH_BYTES = 720
@@ -28,6 +29,25 @@ object DriveMetadata {
         val index: Int,
         val total: Int,
     )
+
+    fun withTags(marker: String, tags: Collection<String>): String {
+        val clean = tags.mapNotNull { sanitizeTag(it) }.distinct().take(20)
+        return if (clean.isEmpty()) marker else "$marker\n$TAG_PREFIX${clean.joinToString(",")}"
+    }
+
+    fun parseTags(caption: String): List<String> = caption.lines()
+        .firstOrNull { it.startsWith(TAG_PREFIX) }
+        ?.removePrefix(TAG_PREFIX)
+        ?.split(',')
+        ?.mapNotNull(::sanitizeTag)
+        ?.distinct()
+        .orEmpty()
+
+    private fun sanitizeTag(raw: String): String? = raw.trim()
+        .lowercase()
+        .replace(Regex("[^\\p{L}\\p{N}_-]"), "")
+        .take(32)
+        .takeIf { it.isNotBlank() }
 
     fun encodeFile(path: String): String {
         val normalized = normalizeFilePath(path)
