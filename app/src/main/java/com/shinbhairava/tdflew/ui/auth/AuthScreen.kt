@@ -2,10 +2,6 @@ package com.shinbhairava.tdflew.ui.auth
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -62,9 +58,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -186,12 +185,10 @@ fun AuthScreen(
                 shadowElevation = 10.dp,
             ) {
                 Column(modifier = Modifier.padding(22.dp)) {
-                    AnimatedContent(
-                        targetState = step,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "auth-step",
-                    ) { target ->
-                        when (target) {
+                    // Do not cross-fade authentication forms: the old and new
+                    // layouts overlap during the first state change, which can
+                    // make labels and words appear doubled on slower devices.
+                    when (val target = step) {
                             is AuthStep.Starting -> ConnectingContent("Connecting securely to Telegram…")
                             is AuthStep.SigningOut -> ConnectingContent("Signing out of Telegram…")
                             is AuthStep.Ready -> ConnectingContent("Opening your drive…")
@@ -262,7 +259,6 @@ fun AuthScreen(
                                 message = target.message,
                                 onRetry = { manager.retry() },
                             )
-                        }
                     }
                 }
             }
@@ -334,6 +330,18 @@ private fun PhoneForm(
     onSubmit: (String) -> Unit,
 ) {
     var phone by rememberSaveable { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        // TDLib usually reaches PhoneNumber shortly after the activity starts.
+        // Request focus after the first layout pass so the first screen is
+        // immediately usable instead of requiring an extra tap.
+        delay(250)
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
+
     FormTitle("Sign in to Telegram", "Use your Telegram account to turn a chat into your private drive.")
     OutlinedTextField(
         value = phone,
@@ -346,7 +354,9 @@ private fun PhoneForm(
             keyboardType = KeyboardType.Phone,
             imeAction = ImeAction.Done,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester),
     )
     ErrorText(error)
     Spacer(Modifier.height(18.dp))
