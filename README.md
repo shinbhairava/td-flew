@@ -86,9 +86,10 @@ Create a keystore locally, then add these repository secrets:
 | `ANDROID_KEY_ALIAS` | Key alias |
 | `ANDROID_KEY_PASSWORD` | Key password |
 
-For a tag build, CI decodes the keystore to `$RUNNER_TEMP/release.keystore`, exports
-`ANDROID_KEYSTORE_PATH`, and signs the release APK. A `v*` tag fails early if any signing
-secret is missing. Pull-request builds do not need signing secrets.
+Every CI run decodes the keystore to `$RUNNER_TEMP/release.keystore`, exports
+`ANDROID_KEYSTORE_PATH`, and signs both the release artifact and the tag release. CI fails
+early if any signing secret is missing. Pull requests from forks cannot access repository
+secrets; run those workflows from the repository or use a maintainer-approved rerun.
 
 Example keystore creation:
 
