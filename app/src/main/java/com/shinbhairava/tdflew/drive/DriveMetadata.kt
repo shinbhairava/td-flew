@@ -75,8 +75,9 @@ object DriveMetadata {
         ?.let(::normalizeFolderPath)
 
     fun parseChunk(caption: String): Chunk? {
-        val fields = caption.trim().removePrefix(CHUNK_PREFIX)
-            .takeIf { caption.trim().startsWith(CHUNK_PREFIX) }
+        val marker = caption.trim().lineSequence().firstOrNull().orEmpty()
+        val fields = marker.removePrefix(CHUNK_PREFIX)
+            .takeIf { marker.startsWith(CHUNK_PREFIX) }
             ?.split(':') ?: return null
         if (fields.size != 4) return null
         val path = try {
@@ -150,7 +151,7 @@ object DriveMetadata {
     }
 
     private fun decodeMarker(caption: String, prefix: String): String? {
-        val text = caption.trim()
+        val text = caption.trim().lineSequence().firstOrNull().orEmpty()
         if (!text.startsWith(prefix)) return null
         val encoded = text.removePrefix(prefix)
         if (encoded.isBlank()) return null
