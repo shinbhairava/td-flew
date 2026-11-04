@@ -83,9 +83,9 @@ import com.shinbhairava.tdflew.engine.GalleryQuery
 import com.shinbhairava.tdflew.engine.TelegramManager
 import com.shinbhairava.tdflew.engine.filterGallery
 import com.shinbhairava.tdflew.engine.friendlyError
-import com.shinbhairava.tdflew.ui.ScreenHeader
 import com.shinbhairava.tdflew.ui.components.EmptyState
 import com.shinbhairava.tdflew.ui.components.LoadingState
+import com.shinbhairava.tdflew.ui.components.ScreenHeader
 import com.shinbhairava.tdflew.ui.components.TdImage
 import com.shinbhairava.tdflew.ui.dayKey
 import com.shinbhairava.tdflew.ui.fileSubtitle

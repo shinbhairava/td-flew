@@ -90,7 +90,7 @@ import com.shinbhairava.tdflew.engine.LogEntry
 import com.shinbhairava.tdflew.engine.LogLevel
 import com.shinbhairava.tdflew.engine.TelegramManager
 import com.shinbhairava.tdflew.engine.friendlyError
-import com.shinbhairava.tdflew.ui.ScreenHeader
+import com.shinbhairava.tdflew.ui.components.ScreenHeader
 import com.shinbhairava.tdflew.ui.components.TdAvatar
 import com.shinbhairava.tdflew.ui.formatBytes
 import com.shinbhairava.tdflew.ui.formatDateTime

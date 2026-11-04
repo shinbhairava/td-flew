@@ -787,7 +787,7 @@ class TelegramManager(
             is TdApi.MessageVideo -> {
                 val video = content.video.video
                 val markerPath = DriveMetadata.parseFilePath(content.caption.text)
-                val fallbackName = DriveMetadata.sanitizeName(video.fileName)
+                val fallbackName = DriveMetadata.sanitizeName(content.video.fileName)
                     ?: "Video_${message.id}.mp4"
                 val path = markerPath ?: "/$fallbackName"
                 DriveItem(
@@ -1285,6 +1285,7 @@ class TelegramManager(
             _filePaths.update { paths ->
                 val updated = paths + (file.id to file.local.path)
                 if (updated.size <= 1_000) updated else updated.entries
+                    .toList()
                     .takeLast(750)
                     .associate { it.key to it.value }
             }
