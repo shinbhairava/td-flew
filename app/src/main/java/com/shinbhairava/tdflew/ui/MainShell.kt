@@ -9,15 +9,11 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -108,39 +104,20 @@ fun MainShell(container: AppContainer) {
                     if (activeTransfers.isNotEmpty()) {
                         ActiveTransferStrip(records = activeTransfers)
                     }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Surface(
-                            modifier = Modifier
-                                .width(332.dp)
-                                .height(64.dp),
-                            shape = RoundedCornerShape(28.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            tonalElevation = 3.dp,
-                        ) {
-                            ShortNavigationBar(
-                                modifier = Modifier.fillMaxWidth(),
-                                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                            ) {
-                                MainTab.entries.forEach { tab ->
-                                    val selected = tab == selectedTab
-                                    ShortNavigationBarItem(
-                                        selected = selected,
-                                        onClick = { selectedTabName = tab.name },
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selected) tab.selectedIcon else tab.icon,
-                                                contentDescription = tab.label,
-                                            )
-                                        },
-                                        label = { Text(tab.label) },
+                    ShortNavigationBar {
+                        MainTab.entries.forEach { tab ->
+                            val selected = tab == selectedTab
+                            ShortNavigationBarItem(
+                                selected = selected,
+                                onClick = { selectedTabName = tab.name },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (selected) tab.selectedIcon else tab.icon,
+                                        contentDescription = tab.label,
                                     )
-                                }
-                            }
+                                },
+                                label = { Text(tab.label) },
+                            )
                         }
                     }
                 }
