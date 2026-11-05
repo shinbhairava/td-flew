@@ -782,9 +782,9 @@ class TelegramManager(
                     ?: "File_${message.id}"
                 val path = markerPath ?: "/$fallbackName"
                 val file = document.document
-                val mimeType = document.mimeType.ifBlank {
-                    MediaTools.guessMimeType(fallbackName)
-                }
+                val mimeType = document.mimeType
+                    .takeIf { it.isNotBlank() && it != "application/octet-stream" }
+                    ?: MediaTools.guessMimeType(fallbackName)
                 val kind = when {
                     mimeType.startsWith("image/") -> DriveItemKind.PHOTO
                     mimeType.startsWith("video/") -> DriveItemKind.VIDEO

@@ -523,7 +523,7 @@ fun MenuScreen(
     if (showAbout) {
         AboutDialog(
             onDismiss = { showAbout = false },
-            onOpenGitHub = { openUrl(context, BuildConfig.GITHUB_REPO_URL) },
+            onDonate = { openUrl(context, "mailto:shinbhairava@proton.me") },
             onOpenLicenses = {
                 showAbout = false
                 showLicenses = true
@@ -1235,7 +1235,7 @@ private fun LogsSheet(
 @Composable
 private fun AboutDialog(
     onDismiss: () -> Unit,
-    onOpenGitHub: () -> Unit,
+    onDonate: () -> Unit,
     onOpenLicenses: () -> Unit,
 ) {
     AlertDialog(
@@ -1276,10 +1276,10 @@ private fun AboutDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onOpenGitHub) {
-                Icon(Icons.Outlined.OpenInNew, contentDescription = null)
+            TextButton(onClick = onDonate) {
+                Icon(Icons.Outlined.FavoriteBorder, contentDescription = null)
                 Spacer(Modifier.size(6.dp))
-                Text("GitHub")
+                Text("Donate")
             }
         },
         dismissButton = {
