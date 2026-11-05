@@ -51,7 +51,8 @@ class AutoBackupWorker(
                 val size = file.length()
                 val key = file.uri.toString()
                 if (!container.settings.backupStamp(key, modified, size)) {
-                    val mimeType = file.type?.takeIf { it.isNotBlank() }
+                    val mimeType = file.type
+                        ?.takeIf { it.isNotBlank() && it != "application/octet-stream" }
                         ?: MediaTools.guessMimeType(file.name.orEmpty())
                     container.telegram.upload(
                         uri = file.uri,
