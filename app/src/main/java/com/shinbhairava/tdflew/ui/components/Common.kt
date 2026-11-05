@@ -1,6 +1,5 @@
 package com.shinbhairava.tdflew.ui.components
 
-import android.widget.VideoView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -137,40 +135,6 @@ fun TdImage(
                 modifier = Modifier.size(32.dp),
             )
         }
-    }
-}
-
-@Composable
-fun TdVideo(
-    manager: TelegramManager,
-    fileId: Int?,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-) {
-    val filePaths by manager.filePaths.collectAsStateWithLifecycle()
-    val path = fileId?.let { filePaths[it] }
-    LaunchedEffect(fileId, path) {
-        if (fileId != null) manager.requestPreviewFile(fileId, priority = 1)
-    }
-    if (path.isNullOrBlank()) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.Image, contentDescription = contentDescription)
-        }
-    } else {
-        AndroidView(
-            factory = { context -> VideoView(context) },
-            update = { view ->
-                if (view.tag != path) {
-                    view.tag = path
-                    view.setVideoPath(path)
-                    view.setOnPreparedListener { player ->
-                        player.isLooping = true
-                        player.start()
-                    }
-                }
-            },
-            modifier = modifier,
-        )
     }
 }
 

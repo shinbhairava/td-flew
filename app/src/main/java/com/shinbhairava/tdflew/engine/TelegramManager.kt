@@ -722,6 +722,11 @@ class TelegramManager(
         cachedSnapshot = null
     }
 
+    fun refreshPreviews() {
+        requestedFiles.clear()
+        _filePaths.value = emptyMap()
+    }
+
     private fun collapseChunks(items: List<DriveItem>): List<DriveItem> {
         val result = mutableListOf<DriveItem>()
         items.filter { it.chunkGroup == null }.forEach { item ->

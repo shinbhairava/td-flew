@@ -92,7 +92,6 @@ import com.shinbhairava.tdflew.ui.components.EmptyState
 import com.shinbhairava.tdflew.ui.components.LoadingState
 import com.shinbhairava.tdflew.ui.components.ScreenHeader
 import com.shinbhairava.tdflew.ui.components.TdImage
-import com.shinbhairava.tdflew.ui.components.TdVideo
 import com.shinbhairava.tdflew.ui.dayKey
 import com.shinbhairava.tdflew.ui.fileSubtitle
 import com.shinbhairava.tdflew.ui.formatBytes
@@ -234,7 +233,10 @@ fun GalleryScreen(
                 subtitle = drive?.let { "${it.title} · ${media.size} photos & videos" },
                 actions = {
                     FilledTonalIconButton(
-                        onClick = { refreshToken += 1 },
+                        onClick = {
+                            manager.refreshPreviews()
+                            refreshToken += 1
+                        },
                         enabled = !loading,
                     ) {
                         Icon(Icons.Outlined.Refresh, contentDescription = "Refresh gallery")
@@ -678,24 +680,19 @@ private fun MediaViewer(
                 modifier = Modifier.fillMaxSize(),
             ) { page ->
                 val pageItem = items[page]
-                if (pageItem.kind == DriveItemKind.VIDEO) {
-                    TdVideo(
-                        manager = manager,
-                        fileId = pageItem.fileId,
-                        contentDescription = pageItem.name,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    TdImage(
-                        manager = manager,
-                        fileId = pageItem.fileId ?: pageItem.thumbnailFileId,
-                        contentDescription = pageItem.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                        placeholderIcon = Icons.Outlined.Image,
-                        priority = 1,
-                    )
-                }
+                TdImage(
+                    manager = manager,
+                    fileId = pageItem.thumbnailFileId ?: pageItem.fileId,
+                    contentDescription = pageItem.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    placeholderIcon = if (pageItem.kind == DriveItemKind.VIDEO) {
+                        Icons.Outlined.Videocam
+                    } else {
+                        Icons.Outlined.Image
+                    },
+                    priority = 1,
+                )
             }
 
             if (item.kind == DriveItemKind.VIDEO) {
@@ -801,7 +798,7 @@ private fun MediaViewer(
                                     tint = Color.White,
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text("Play video", color = Color.White)
+                         Text("Open video", color = Color.White)
                             }
                         }
                         TextButton(onClick = { onSave(item) }, enabled = actionBusy == null) {

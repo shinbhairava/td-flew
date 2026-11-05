@@ -140,7 +140,10 @@ fun FilesScreen(
     val folders = snapshot?.folders.orEmpty()
         .filter { it.parentPath == currentPath }
         .sortedFor(sortField, direction)
-    val files = snapshot?.files.orEmpty()
+    // Gallery media are also regular drive files. Keeping them in this list
+    // lets users arrange photos and videos into folders without removing them
+    // from Gallery.
+    val files = (snapshot?.files.orEmpty() + snapshot?.media.orEmpty())
         .filter { it.parentPath == currentPath }
         .sortedFor(sortField, direction)
     val listItems = folders + files
@@ -220,7 +223,10 @@ fun FilesScreen(
                 },
                 actions = {
                     FilledTonalIconButton(
-                        onClick = { refreshToken += 1 },
+                        onClick = {
+                            manager.refreshPreviews()
+                            refreshToken += 1
+                        },
                         enabled = !loading,
                     ) {
                         Icon(Icons.Outlined.Refresh, contentDescription = "Refresh files")
