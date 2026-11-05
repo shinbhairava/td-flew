@@ -108,6 +108,7 @@ import java.io.File
 fun MenuScreen(
     container: AppContainer,
     onMessage: (String) -> Unit,
+    showBars: Boolean = true,
 ) {
     val manager = container.telegram
     val transfers = container.transfers
@@ -166,7 +167,7 @@ fun MenuScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                ScreenHeader(
+                if (showBars) ScreenHeader(
                     title = "Menu",
                     subtitle = profile?.username?.let { "@$it" } ?: "Telegram drive controls",
                     actions = {

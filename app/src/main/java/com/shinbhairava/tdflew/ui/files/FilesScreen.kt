@@ -101,6 +101,7 @@ fun FilesScreen(
     manager: TelegramManager,
     onMessage: (String) -> Unit,
     onOpenMenu: () -> Unit,
+    showBars: Boolean = true,
 ) {
     val drive by manager.driveChat.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -163,7 +164,7 @@ fun FilesScreen(
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         val target = uploadTargetPath
         uploading = true
-        scope.launch {
+        manager.launchBackground {
             var success = 0
             var failure: String? = null
             uris.forEach { uri ->
@@ -197,7 +198,7 @@ fun FilesScreen(
     }
 
     fun runAction(label: String, action: suspend () -> Unit) {
-        scope.launch {
+        manager.launchBackground {
             try {
                 action()
             } catch (throwable: Throwable) {
@@ -224,7 +225,7 @@ fun FilesScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            ScreenHeader(
+            if (showBars) ScreenHeader(
                 title = if (currentPath == "/") "Files" else DriveMetadata.nameOf(currentPath),
                 subtitle = drive?.let {
                     "${it.title} · ${folders.size} folders · ${files.size} files"
@@ -241,14 +242,14 @@ fun FilesScreen(
                             style = MaterialTheme.typography.labelLarge,
                         )
                         FilledTonalIconButton(onClick = {
-                            scope.launch {
+                            manager.launchBackground {
                                 selectedItems.forEach { manager.download(it) }
                                 selectedIds = emptySet()
                                 onMessage("Downloaded ${selectedItems.size} file(s)")
                             }
                         }) { Icon(Icons.Outlined.Download, contentDescription = "Download selected") }
                         FilledTonalIconButton(onClick = {
-                            scope.launch {
+                            manager.launchBackground {
                                 manager.shareItems(selectedItems)
                                 selectedIds = emptySet()
                             }
@@ -258,7 +259,7 @@ fun FilesScreen(
                             selectedIds = emptySet()
                         }) { Icon(Icons.Outlined.FolderShared, contentDescription = "Move selected") }
                         FilledTonalIconButton(onClick = {
-                            scope.launch {
+                            manager.launchBackground {
                                 selectedItems.forEach { manager.deleteItem(it) }
                                 selectedIds = emptySet()
                                 refreshToken += 1
@@ -462,7 +463,7 @@ fun FilesScreen(
                         label = "Save to Downloads",
                         onClick = {
                             actionItem = null
-                            scope.launch {
+                            manager.launchBackground {
                                 try {
                                     val saved = manager.download(item)
                                     onMessage("Saved to ${saved.displayPath}")
@@ -590,7 +591,7 @@ fun FilesScreen(
                             return@Button
                         }
                         creatingFolder = true
-                        scope.launch {
+                        manager.launchBackground {
                             try {
                                 manager.createFolder(currentPath, name)
                                 onMessage("Created folder $name")
@@ -643,7 +644,7 @@ fun FilesScreen(
                 Button(
                     onClick = {
                         deleteTarget = null
-                        scope.launch {
+                        manager.launchBackground {
                             try {
                                 val count = manager.deleteItem(item)
                                 onMessage("Deleted $count item(s)")

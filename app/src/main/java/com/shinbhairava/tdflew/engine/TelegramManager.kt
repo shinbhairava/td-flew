@@ -224,6 +224,8 @@ class TelegramManager(
         }
     }
 
+    fun launchBackground(block: suspend () -> Unit) = scope.launch { block() }
+
     fun retry() {
         val current = client
         if (current == null) {
@@ -799,7 +801,14 @@ class TelegramManager(
                     chunkIndex = chunk?.index ?: 0,
                     chunkTotal = chunk?.total ?: 0,
                     chunkParts = if (chunk != null) {
-                        listOf(DriveChunkPart(message.id, file.id, file.size, chunk.index))
+                        listOf(
+                            DriveChunkPart(
+                                message.id,
+                                file.id,
+                                file.size.takeIf { it > 0L } ?: file.expectedSize,
+                                chunk.index,
+                            ),
+                        )
                     } else {
                         emptyList()
                     },
@@ -1379,6 +1388,9 @@ class TelegramManager(
                             require(source.isFile) { "Telegram did not return a local copy of a file part." }
                             FileInputStream(source).use { input -> input.copyTo(out) }
                         }
+                    }
+                    require(output.length() == item.size) {
+                        "The merged file is incomplete (${output.length()} of ${item.size} bytes)."
                     }
                     output
                 }

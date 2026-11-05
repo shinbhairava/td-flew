@@ -105,6 +105,7 @@ fun GalleryScreen(
     manager: TelegramManager,
     onMessage: (String) -> Unit,
     onOpenMenu: () -> Unit,
+    showBars: Boolean = true,
 ) {
     val drive by manager.driveChat.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -147,7 +148,7 @@ fun GalleryScreen(
     ) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         uploading = true
-        scope.launch {
+        manager.launchBackground {
             var success = 0
             var failure: String? = null
             uris.forEach { uri ->
@@ -188,7 +189,7 @@ fun GalleryScreen(
 
     fun saveItem(item: DriveItem) {
         actionBusy = "Saving…"
-        scope.launch {
+        manager.launchBackground {
             try {
                 val saved = manager.download(item)
                 onMessage("Saved to ${saved.displayPath}")
@@ -202,7 +203,7 @@ fun GalleryScreen(
 
     fun openItem(item: DriveItem) {
         actionBusy = "Opening…"
-        scope.launch {
+        manager.launchBackground {
             try {
                 manager.open(item)
             } catch (throwable: Throwable) {
@@ -215,7 +216,7 @@ fun GalleryScreen(
 
     fun shareItem(item: DriveItem) {
         actionBusy = "Preparing…"
-        scope.launch {
+        manager.launchBackground {
             try {
                 manager.share(item)
             } catch (throwable: Throwable) {
@@ -228,7 +229,7 @@ fun GalleryScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            ScreenHeader(
+            if (showBars) ScreenHeader(
                 title = "Gallery",
                 subtitle = drive?.let { "${it.title} · ${media.size} photos & videos" },
                 actions = {
@@ -384,7 +385,7 @@ fun GalleryScreen(
                 Button(onClick = {
                     val selected = editTagsItem ?: return@Button
                     editTagsItem = null
-                    scope.launch {
+                    manager.launchBackground {
                         runCatching { manager.updateTags(selected, editTags.split(Regex("[ ,]+"))) }
                             .onSuccess { onMessage("Tags updated") }
                             .onFailure { onMessage(friendlyError(it)) }
@@ -411,7 +412,7 @@ fun GalleryScreen(
                 Button(
                     onClick = {
                         deleteTarget = null
-                        scope.launch {
+                        manager.launchBackground {
                             try {
                                 manager.deleteItem(item)
                                 onMessage("Deleted ${item.name}")
@@ -710,8 +711,8 @@ private fun MediaViewer(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = Icons.Outlined.PlayArrow,
-                            contentDescription = "Play video",
+                             imageVector = Icons.Outlined.OpenInNew,
+                             contentDescription = "Open video externally",
                             tint = Color.White,
                             modifier = Modifier
                                 .size(52.dp)

@@ -37,6 +37,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,6 +68,16 @@ fun MainShell(container: AppContainer) {
     val drive by manager.driveChat.collectAsStateWithLifecycle()
     val transferRecords by container.transfers.records.collectAsStateWithLifecycle()
     var selectedTabName by rememberSaveable { mutableStateOf(MainTab.GALLERY.name) }
+    var barsVisible by rememberSaveable { mutableStateOf(true) }
+    val scrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -2f) barsVisible = false
+                if (available.y > 2f) barsVisible = true
+                return Offset.Zero
+            }
+        }
+    }
     val selectedTab = MainTab.entries.firstOrNull { it.name == selectedTabName } ?: MainTab.GALLERY
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -77,24 +91,26 @@ fun MainShell(container: AppContainer) {
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            Column {
-                if (activeTransfers.isNotEmpty()) {
-                    ActiveTransferStrip(records = activeTransfers)
-                }
-                ShortNavigationBar {
-                    MainTab.entries.forEach { tab ->
-                        val selected = tab == selectedTab
-                        ShortNavigationBarItem(
-                            selected = selected,
-                            onClick = { selectedTabName = tab.name },
-                            icon = {
-                                Icon(
-                                    imageVector = if (selected) tab.selectedIcon else tab.icon,
-                                    contentDescription = tab.label,
-                                )
-                            },
-                            label = { Text(tab.label) },
-                        )
+            if (barsVisible) {
+                Column {
+                    if (activeTransfers.isNotEmpty()) {
+                        ActiveTransferStrip(records = activeTransfers)
+                    }
+                    ShortNavigationBar {
+                        MainTab.entries.forEach { tab ->
+                            val selected = tab == selectedTab
+                            ShortNavigationBarItem(
+                                selected = selected,
+                                onClick = { selectedTabName = tab.name },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (selected) tab.selectedIcon else tab.icon,
+                                        contentDescription = tab.label,
+                                    )
+                                },
+                                label = { Text(tab.label) },
+                            )
+                        }
                     }
                 }
             }
@@ -104,24 +120,27 @@ fun MainShell(container: AppContainer) {
             targetState = selectedTab,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             label = "main-tab",
-            modifier = Modifier.padding(padding),
+            modifier = Modifier.padding(padding).nestedScroll(scrollConnection),
         ) { tab ->
             when (tab) {
                 MainTab.GALLERY -> GalleryScreen(
                     manager = manager,
                     onMessage = onMessage,
                     onOpenMenu = { selectedTabName = MainTab.MENU.name },
+                    showBars = barsVisible,
                 )
 
                 MainTab.FILES -> FilesScreen(
                     manager = manager,
                     onMessage = onMessage,
                     onOpenMenu = { selectedTabName = MainTab.MENU.name },
+                    showBars = barsVisible,
                 )
 
                 MainTab.MENU -> MenuScreen(
                     container = container,
                     onMessage = onMessage,
+                    showBars = barsVisible,
                 )
             }
         }
