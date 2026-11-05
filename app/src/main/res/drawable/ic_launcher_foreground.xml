@@ -19,18 +19,18 @@
     <!-- FLEW lettering -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M24,56h18v5H30v6h11v5H30v10h-6z" />
+        android:pathData="M29,60h11v3H33v4h6v3h-6v6h-4z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M46,56h6v21h12v5H46z" />
+        android:pathData="M43,60h4v13h7v3H43z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M68,56h18v5H74v5h11v5H74v6h12v5H68z" />
+        android:pathData="M56,60h11v3h-7v3h6v3h-6v4h7v3H56z" />
     <path
-        android:pathData="M89,56 L93,82 L98,67 L103,82 L107,56"
+        android:pathData="M70,60 L73,76 L77,67 L81,76 L84,60"
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFF"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:strokeWidth="4" />
+        android:strokeWidth="3" />
 </vector>
