@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -236,24 +237,37 @@ fun GalleryScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             AnimatedVisibility(
                 visible = showBars,
-                enter = slideInVertically { -it } + fadeIn(),
-                exit = slideOutVertically { -it } + fadeOut(),
+                enter = slideInVertically(animationSpec = tween(420)) { -it } + fadeIn(tween(300)),
+                exit = slideOutVertically(animationSpec = tween(420)) { -it } + fadeOut(tween(300)),
             ) {
-                ScreenHeader(
-                title = "Gallery",
-                subtitle = drive?.let { "${it.title} · ${media.size} photos & videos" },
-                actions = {
-                    FilledTonalIconButton(
-                        onClick = {
-                            manager.refreshPreviews()
-                            refreshToken += 1
+                Column {
+                    ScreenHeader(
+                        title = "Gallery",
+                        subtitle = drive?.let { "${it.title} · ${media.size} photos & videos" },
+                        actions = {
+                            FilledTonalIconButton(
+                                onClick = {
+                                    manager.refreshPreviews()
+                                    refreshToken += 1
+                                },
+                                enabled = !loading,
+                            ) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = "Refresh gallery")
+                            }
                         },
-                        enabled = !loading,
-                    ) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh gallery")
+                    )
+                    if (drive != null) {
+                        if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        if (snapshot?.truncated == true) TruncatedBanner()
+                        SearchAndFilters(
+                            search = search,
+                            onSearchChange = { search = it },
+                            preset = preset,
+                            onPresetChange = { presetName = it.name },
+                            resultCount = filtered.size,
+                        )
                     }
-                },
-                )
+                }
             }
 
             if (drive == null) {
@@ -267,22 +281,6 @@ fun GalleryScreen(
                 )
                 return@Column
             }
-
-            if (loading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            if (snapshot?.truncated == true) {
-                TruncatedBanner()
-            }
-
-            SearchAndFilters(
-                search = search,
-                onSearchChange = { search = it },
-                preset = preset,
-                onPresetChange = { presetName = it.name },
-                resultCount = filtered.size,
-            )
 
             when {
                 error != null -> EmptyState(

@@ -6,13 +6,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -96,27 +101,39 @@ fun MainShell(container: AppContainer) {
         bottomBar = {
             AnimatedVisibility(
                 visible = barsVisible,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
+                enter = slideInVertically(animationSpec = tween(420)) { it } + fadeIn(tween(300)),
+                exit = slideOutVertically(animationSpec = tween(420)) { it } + fadeOut(tween(300)),
             ) {
                 Column {
                     if (activeTransfers.isNotEmpty()) {
                         ActiveTransferStrip(records = activeTransfers)
                     }
-                    ShortNavigationBar {
-                        MainTab.entries.forEach { tab ->
-                            val selected = tab == selectedTab
-                            ShortNavigationBarItem(
-                                selected = selected,
-                                onClick = { selectedTabName = tab.name },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (selected) tab.selectedIcon else tab.icon,
-                                        contentDescription = tab.label,
-                                    )
-                                },
-                                label = { Text(tab.label) },
-                            )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ShortNavigationBar(
+                            modifier = Modifier
+                                .widthIn(max = 380.dp)
+                                .clip(RoundedCornerShape(28.dp)),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            MainTab.entries.forEach { tab ->
+                                val selected = tab == selectedTab
+                                ShortNavigationBarItem(
+                                    selected = selected,
+                                    onClick = { selectedTabName = tab.name },
+                                    icon = {
+                                        Icon(
+                                            imageVector = if (selected) tab.selectedIcon else tab.icon,
+                                            contentDescription = tab.label,
+                                        )
+                                    },
+                                    label = { Text(tab.label) },
+                                )
+                            }
                         }
                     }
                 }

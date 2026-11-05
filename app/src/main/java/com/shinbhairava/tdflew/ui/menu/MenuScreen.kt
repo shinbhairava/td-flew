@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -174,8 +175,8 @@ fun MenuScreen(
             item {
                 AnimatedVisibility(
                     visible = showBars,
-                    enter = slideInVertically { -it } + fadeIn(),
-                    exit = slideOutVertically { -it } + fadeOut(),
+                    enter = slideInVertically(animationSpec = tween(420)) { -it } + fadeIn(tween(300)),
+                    exit = slideOutVertically(animationSpec = tween(420)) { -it } + fadeOut(tween(300)),
                 ) {
                     ScreenHeader(
                     title = "Menu",

@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -232,11 +233,12 @@ fun FilesScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             AnimatedVisibility(
                 visible = showBars,
-                enter = slideInVertically { -it } + fadeIn(),
-                exit = slideOutVertically { -it } + fadeOut(),
+                enter = slideInVertically(animationSpec = tween(420)) { -it } + fadeIn(tween(300)),
+                exit = slideOutVertically(animationSpec = tween(420)) { -it } + fadeOut(tween(300)),
             ) {
-                ScreenHeader(
-                title = if (currentPath == "/") "Files" else DriveMetadata.nameOf(currentPath),
+                Column {
+                    ScreenHeader(
+                    title = if (currentPath == "/") "Files" else DriveMetadata.nameOf(currentPath),
                 subtitle = drive?.let {
                     "${it.title} · ${folders.size} folders · ${files.size} files"
                 },
@@ -298,7 +300,19 @@ fun FilesScreen(
                         }
                     }
                 },
-                )
+                    )
+                    if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Breadcrumbs(
+                        path = currentPath,
+                        onNavigate = { currentPath = it },
+                    )
+                    SortControls(
+                        field = sortField,
+                        descending = descending,
+                        onFieldChange = { sortFieldName = it.name },
+                        onToggleDirection = { descending = !descending },
+                    )
+                }
             }
 
             if (drive == null) {
@@ -312,22 +326,6 @@ fun FilesScreen(
                 )
                 return@Column
             }
-
-            if (loading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            Breadcrumbs(
-                path = currentPath,
-                onNavigate = { currentPath = it },
-            )
-
-            SortControls(
-                field = sortField,
-                descending = descending,
-                onFieldChange = { sortFieldName = it.name },
-                onToggleDirection = { descending = !descending },
-            )
 
             when {
                 error != null -> EmptyState(
