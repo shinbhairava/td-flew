@@ -1,4 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/app_icon"
-    android:gravity="fill" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Flat folder silhouette -->
+    <path
+        android:fillColor="#60A5FA"
+        android:pathData="M16,25h25l7,8h44c4.4,0 8,3.6 8,8v7H8v-15c0,-4.4 3.6,-8 8,-8z" />
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M8,42h92v42c0,4.4 -3.6,8 -8,8H16c-4.4,0 -8,-3.6 -8,-8z" />
+    <path
+        android:fillColor="#1D4ED8"
+        android:pathData="M8,42h92v7H8z" />
+
+    <!-- FLEW lettering -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,56h18v5H30v6h11v5H30v10h-6z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,56h6v21h12v5H46z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M68,56h18v5H74v5h11v5H74v6h12v5H68z" />
+    <path
+        android:pathData="M89,56 L93,82 L98,67 L103,82 L107,56"
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter"
+        android:strokeWidth="4" />
+</vector>
