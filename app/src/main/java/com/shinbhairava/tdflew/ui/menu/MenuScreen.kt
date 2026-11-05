@@ -246,6 +246,75 @@ fun MenuScreen(
 
             item {
                 MenuCard(
+                    icon = Icons.Outlined.CloudUpload,
+                    title = "Automatic backup",
+                    supporting = if (backupEnabled) {
+                        "${backupUris.size} folder(s) · every ${backupInterval} minutes"
+                    } else {
+                        "Select Android folders to back up to Telegram"
+                    },
+                ) {
+                    backupUris.forEach { raw ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = Uri.parse(raw).lastPathSegment?.substringAfterLast(':') ?: raw,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            TextButton(onClick = {
+                                container.settings.removeBackupUri(raw)
+                                backupUris = container.settings.backupUris()
+                                AutoBackupScheduler.reschedule(context)
+                            }) { Text("Remove") }
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = backupEnabled,
+                            onCheckedChange = {
+                                backupEnabled = it
+                                container.settings.setBackupEnabled(it)
+                                AutoBackupScheduler.reschedule(context)
+                            },
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (backupEnabled) "Enabled" else "Disabled")
+                    }
+                    OutlinedTextField(
+                        value = backupInterval,
+                        onValueChange = { value ->
+                            backupInterval = value.filter(Char::isDigit)
+                            value.toLongOrNull()?.let {
+                                container.settings.setBackupIntervalMinutes(it)
+                                if (backupEnabled) AutoBackupScheduler.reschedule(context)
+                            }
+                        },
+                        label = { Text("Interval (minutes, minimum 15)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(onClick = { backupFolderPicker.launch(null) }) {
+                            Icon(Icons.Outlined.FolderShared, contentDescription = null)
+                            Spacer(Modifier.size(6.dp))
+                            Text("Add Android folder")
+                        }
+                        if (android.os.Build.VERSION.SDK_INT >= 31) {
+                            OutlinedButton(onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
+                                }
+                            }) { Text("Alarm permission") }
+                        }
+                    }
+                }
+            }
+            item {
+                MenuCard(
                     icon = Icons.Outlined.Storage,
                     title = "Storage & cache",
                     supporting = cacheSize?.let { "${formatBytes(it)} used by TD Flew" } ?: "Calculating…",
@@ -1245,72 +1314,3 @@ private fun openUrl(context: Context, url: String) {
         )
     }
 }
-            item {
-                MenuCard(
-                    icon = Icons.Outlined.CloudUpload,
-                    title = "Automatic backup",
-                    supporting = if (backupEnabled) {
-                        "${backupUris.size} folder(s) · every ${backupInterval} minutes"
-                    } else {
-                        "Select Android folders to back up to Telegram"
-                    },
-                ) {
-                    backupUris.forEach { raw ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = Uri.parse(raw).lastPathSegment?.substringAfterLast(':') ?: raw,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            TextButton(onClick = {
-                                container.settings.removeBackupUri(raw)
-                                backupUris = container.settings.backupUris()
-                                AutoBackupScheduler.reschedule(context)
-                            }) { Text("Remove") }
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Switch(
-                            checked = backupEnabled,
-                            onCheckedChange = {
-                                backupEnabled = it
-                                container.settings.setBackupEnabled(it)
-                                AutoBackupScheduler.reschedule(context)
-                            },
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        Text(if (backupEnabled) "Enabled" else "Disabled")
-                    }
-                    OutlinedTextField(
-                        value = backupInterval,
-                        onValueChange = { value ->
-                            backupInterval = value.filter(Char::isDigit)
-                            value.toLongOrNull()?.let {
-                                container.settings.setBackupIntervalMinutes(it)
-                                if (backupEnabled) AutoBackupScheduler.reschedule(context)
-                            }
-                        },
-                        label = { Text("Interval (minutes, minimum 15)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { backupFolderPicker.launch(null) }) {
-                            Icon(Icons.Outlined.FolderShared, contentDescription = null)
-                            Spacer(Modifier.size(6.dp))
-                            Text("Add Android folder")
-                        }
-                        if (android.os.Build.VERSION.SDK_INT >= 31) {
-                            OutlinedButton(onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
-                                }
-                            }) { Text("Alarm permission") }
-                        }
-                    }
-                }
-            }
