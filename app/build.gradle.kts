@@ -39,6 +39,13 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
 
+        // Keep the release APK small for current Android phones. Most supported
+        // devices use arm64-v8a; emulator/x86 builds can still be produced by
+        // removing this filter for development.
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -83,6 +90,9 @@ android {
     }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
