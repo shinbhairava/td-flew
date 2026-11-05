@@ -65,6 +65,22 @@ object FileSaver {
         }.getOrDefault(false)
     }
 
+    fun shareMultiple(context: Context, files: List<SavedFile>, mimeTypes: List<String>): Boolean {
+        if (files.isEmpty()) return false
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = if (mimeTypes.all { it.startsWith("image/") }) "image/*" else "*/*"
+            putParcelableArrayListExtra(
+                Intent.EXTRA_STREAM,
+                ArrayList(files.map { Uri.parse(it.uri) }),
+            )
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return runCatching {
+            context.startActivity(Intent.createChooser(send, "Share files"))
+            true
+        }.getOrDefault(false)
+    }
+
     fun sanitizeFileName(raw: String): String {
         val cleaned = raw
             .substringAfterLast('/')

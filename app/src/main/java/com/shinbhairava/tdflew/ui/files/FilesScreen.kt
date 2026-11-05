@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -111,7 +113,8 @@ fun FilesScreen(
     var descending by rememberSaveable { mutableStateOf(false) }
     var actionItem by remember { mutableStateOf<DriveItem?>(null) }
     var deleteTarget by remember { mutableStateOf<DriveItem?>(null) }
-    var moveTarget by remember { mutableStateOf<DriveItem?>(null) }
+    var moveTargets by remember { mutableStateOf<List<DriveItem>>(emptyList()) }
+    var selectedIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     var showCreateFolder by remember { mutableStateOf(false) }
     var folderName by remember { mutableStateOf("") }
     var folderError by remember { mutableStateOf<String?>(null) }
@@ -152,6 +155,7 @@ fun FilesScreen(
         .filter { it.parentPath == currentPath }
         .sortedFor(sortField, direction)
     val listItems = folders + files
+    val selectedItems = listItems.filter { it.id in selectedIds }
 
     val uploadLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
@@ -203,6 +207,10 @@ fun FilesScreen(
     }
 
     fun openItem(item: DriveItem) {
+        if (selectedIds.isNotEmpty()) {
+            selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
+            return
+        }
         if (item.isFolder) {
             currentPath = item.path
         } else {
@@ -227,6 +235,37 @@ fun FilesScreen(
                     null
                 },
                 actions = {
+                    if (selectedItems.isNotEmpty()) {
+                        Text(
+                            text = "${selectedItems.size} selected",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        FilledTonalIconButton(onClick = {
+                            scope.launch {
+                                selectedItems.forEach { manager.download(it) }
+                                selectedIds = emptySet()
+                                onMessage("Downloaded ${selectedItems.size} file(s)")
+                            }
+                        }) { Icon(Icons.Outlined.Download, contentDescription = "Download selected") }
+                        FilledTonalIconButton(onClick = {
+                            scope.launch {
+                                manager.shareItems(selectedItems)
+                                selectedIds = emptySet()
+                            }
+                        }) { Icon(Icons.Outlined.Share, contentDescription = "Share selected") }
+                        FilledTonalIconButton(onClick = {
+                            moveTargets = selectedItems
+                            selectedIds = emptySet()
+                        }) { Icon(Icons.Outlined.FolderShared, contentDescription = "Move selected") }
+                        FilledTonalIconButton(onClick = {
+                            scope.launch {
+                                selectedItems.forEach { manager.deleteItem(it) }
+                                selectedIds = emptySet()
+                                refreshToken += 1
+                                onMessage("Deleted selected files")
+                            }
+                        }) { Icon(Icons.Outlined.DeleteOutline, contentDescription = "Delete selected") }
+                    }
                     FilledTonalIconButton(
                         onClick = {
                             manager.refreshPreviews()
@@ -321,6 +360,10 @@ fun FilesScreen(
                                 0
                             },
                             onClick = { openItem(item) },
+                            onLongClick = { selectedIds = selectedIds + item.id },
+                            selected = item.id in selectedIds,
+                            selectionMode = selectedItems.isNotEmpty(),
+                            onSelect = { selectedIds = if (it) selectedIds + item.id else selectedIds - item.id },
                             onMore = { actionItem = item },
                         )
                     }
@@ -442,7 +485,7 @@ fun FilesScreen(
                         label = "Move to folder",
                         onClick = {
                             actionItem = null
-                            moveTarget = item
+                            moveTargets = listOf(item)
                         },
                     )
                     SheetAction(
@@ -459,11 +502,11 @@ fun FilesScreen(
         }
     }
 
-    moveTarget?.let { item ->
+    moveTargets.firstOrNull()?.let { item ->
         AlertDialog(
-            onDismissRequest = { moveTarget = null },
+            onDismissRequest = { moveTargets = emptyList() },
             icon = { Icon(Icons.Outlined.FolderShared, contentDescription = null) },
-            title = { Text("Move ${item.name}") },
+            title = { Text("Move ${moveTargets.size} file(s)") },
             text = {
                 Column(
                     modifier = Modifier
@@ -474,9 +517,10 @@ fun FilesScreen(
                 ) {
                     TextButton(
                         onClick = {
-                            moveTarget = null
+                            val targets = moveTargets
+                            moveTargets = emptyList()
                             runAction("Moving") {
-                                manager.moveItem(item, "/")
+                                targets.forEach { manager.moveItem(it, "/") }
                                 refreshToken += 1
                             }
                         },
@@ -488,9 +532,10 @@ fun FilesScreen(
                         .forEach { folder ->
                             TextButton(
                                 onClick = {
-                                    moveTarget = null
+                                    val targets = moveTargets
+                                    moveTargets = emptyList()
                                     runAction("Moving") {
-                                        manager.moveItem(item, folder.path)
+                                        targets.forEach { manager.moveItem(it, folder.path) }
                                         refreshToken += 1
                                     }
                                 },
@@ -502,7 +547,7 @@ fun FilesScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { moveTarget = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { moveTargets = emptyList() }) { Text("Cancel") } },
         )
     }
 
@@ -703,6 +748,10 @@ private fun FileRow(
     manager: TelegramManager,
     childCount: Int,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    selected: Boolean,
+    selectionMode: Boolean,
+    onSelect: (Boolean) -> Unit,
     onMore: () -> Unit,
 ) {
     Surface(
@@ -710,13 +759,16 @@ private fun FileRow(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (selectionMode) {
+                Checkbox(checked = selected, onCheckedChange = onSelect)
+            }
             if (item.isFolder) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,

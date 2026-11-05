@@ -350,7 +350,8 @@ fun GalleryScreen(
             initialPage = filtered.indexOfFirst { it.id == item.id }.coerceAtLeast(0),
             manager = manager,
             actionBusy = actionBusy,
-            onClose = { if (actionBusy == null) viewerItem = null },
+            // Downloads continue in TransferStore after the viewer closes.
+            onClose = { viewerItem = null },
             onSave = { saveItem(it) },
             onOpen = { openItem(it) },
             onShare = { shareItem(it) },
@@ -682,7 +683,11 @@ private fun MediaViewer(
                 val pageItem = items[page]
                 TdImage(
                     manager = manager,
-                    fileId = pageItem.thumbnailFileId ?: pageItem.fileId,
+                    fileId = if (pageItem.kind == DriveItemKind.PHOTO) {
+                        pageItem.fileId ?: pageItem.thumbnailFileId
+                    } else {
+                        pageItem.thumbnailFileId ?: pageItem.fileId
+                    },
                     contentDescription = pageItem.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
@@ -691,7 +696,7 @@ private fun MediaViewer(
                     } else {
                         Icons.Outlined.Image
                     },
-                    priority = 1,
+                    priority = 32,
                 )
             }
 

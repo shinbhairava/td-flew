@@ -1411,6 +1411,13 @@ class TelegramManager(
         }
     }
 
+    suspend fun shareItems(items: List<DriveItem>) {
+        val saved = items.map { download(it) }
+        if (!FileSaver.shareMultiple(context, saved, items.map { it.mimeType })) {
+            throw IllegalStateException("Could not open the share sheet.")
+        }
+    }
+
     fun requestPreviewFile(fileId: Int?, priority: Int = 16) {
         if (fileId == null || fileId == 0) return
         val known = _filePaths.value[fileId]
