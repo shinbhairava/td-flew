@@ -12,7 +12,6 @@ val telegramApiId = (env("API_ID") ?: env("TELEGRAM_API_ID"))?.toIntOrNull() ?: 
 val telegramApiHash = env("API_HASH")
     ?: env("TELEGRAM_API_HASH")
     ?: "014b35b6184100b085b0d0572f9b5103"
-val tdlibVersion = env("TDLIB_VERSION") ?: "a82128a"
 
 val appVersionName = env("APP_VERSION_NAME") ?: "1.0.0"
 val appVersionCode = env("APP_VERSION_CODE")?.toIntOrNull() ?: 1
@@ -96,7 +95,6 @@ android {
         buildConfigField("String", "GITHUB_REPO_LABEL", quoted("shinbhairava/td-flew"))
         buildConfigField("int", "TELEGRAM_API_ID", telegramApiId.toString())
         buildConfigField("String", "TELEGRAM_API_HASH", quoted(telegramApiHash))
-        buildConfigField("String", "TDLIB_VERSION", quoted(tdlibVersion))
     }
 }
 

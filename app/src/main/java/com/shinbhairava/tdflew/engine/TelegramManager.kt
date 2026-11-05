@@ -399,7 +399,7 @@ class TelegramManager(
                     Locale.getDefault().language.takeIf { it.isNotBlank() } ?: "en",
                     Build.MODEL.ifBlank { "Android" },
                     "Android ${Build.VERSION.RELEASE}",
-                     "TD Flew ${BuildConfig.VERSION_NAME} - TDLib ${BuildConfig.TDLIB_VERSION}",
+                     "TD Flew ${BuildConfig.VERSION_NAME}",
                 ),
             )
             log("TDLib parameters configured")
