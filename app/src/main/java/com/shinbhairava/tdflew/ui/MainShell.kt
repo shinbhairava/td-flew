@@ -14,8 +14,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -42,7 +43,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
@@ -114,25 +114,32 @@ fun MainShell(container: AppContainer) {
                             .padding(horizontal = 24.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        ShortNavigationBar(
+                        Surface(
                             modifier = Modifier
-                                .widthIn(max = 380.dp)
-                                .clip(RoundedCornerShape(28.dp)),
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                .width(332.dp)
+                                .height(64.dp),
+                            shape = RoundedCornerShape(28.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tonalElevation = 3.dp,
                         ) {
-                            MainTab.entries.forEach { tab ->
-                                val selected = tab == selectedTab
-                                ShortNavigationBarItem(
-                                    selected = selected,
-                                    onClick = { selectedTabName = tab.name },
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (selected) tab.selectedIcon else tab.icon,
-                                            contentDescription = tab.label,
-                                        )
-                                    },
-                                    label = { Text(tab.label) },
-                                )
+                            ShortNavigationBar(
+                                modifier = Modifier.fillMaxWidth(),
+                                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            ) {
+                                MainTab.entries.forEach { tab ->
+                                    val selected = tab == selectedTab
+                                    ShortNavigationBarItem(
+                                        selected = selected,
+                                        onClick = { selectedTabName = tab.name },
+                                        icon = {
+                                            Icon(
+                                                imageVector = if (selected) tab.selectedIcon else tab.icon,
+                                                contentDescription = tab.label,
+                                            )
+                                        },
+                                        label = { Text(tab.label) },
+                                    )
+                                }
                             }
                         }
                     }
