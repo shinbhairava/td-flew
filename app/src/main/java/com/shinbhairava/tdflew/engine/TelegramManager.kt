@@ -152,7 +152,7 @@ class TelegramManager(
         private const val SEND_TIMEOUT_MS = 30 * 60 * 1000L
         private const val MAX_RECENT_SEND_OUTCOMES = 32
         private val nativeLoaded: Boolean = runCatching {
-            System.loadLibrary("tdjni")
+            System.loadLibrary("tdflew")
         }.isSuccess
     }
 

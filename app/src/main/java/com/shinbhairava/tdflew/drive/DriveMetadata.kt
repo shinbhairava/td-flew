@@ -133,7 +133,6 @@ object DriveMetadata {
             .replace(Regex("[\\u0000-\\u001F\\u007F]"), "")
             .trim()
             .trim('.')
-            .replace(Regex("\\s+"), " ")
 
         if (cleaned.isBlank()) return null
         if (cleaned.length <= MAX_NAME_LENGTH) return cleaned

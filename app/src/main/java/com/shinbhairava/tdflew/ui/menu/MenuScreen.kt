@@ -778,6 +778,16 @@ private fun DrivePickerSheet(
                     .heightIn(max = 300.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
+                if (currentDrive != null && !currentDrive.isSavedMessages) {
+                    ChatRow(
+                        title = currentDrive.title,
+                        subtitle = "Pinned drive · Chat ${currentDrive.id}",
+                        selected = true,
+                        icon = Icons.Outlined.Bookmark,
+                        busy = false,
+                        onClick = { onSelected(currentDrive) },
+                    )
+                }
                 ChatRow(
                     title = "Saved Messages",
                     subtitle = "Private, synced to your own account",

@@ -647,7 +647,7 @@ private fun FileRow(
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -673,6 +673,7 @@ private fun FileRow(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(MaterialTheme.shapes.medium),
+                    priority = 32,
                 )
             } else {
                 Surface(

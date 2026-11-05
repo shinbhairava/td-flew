@@ -578,6 +578,7 @@ private fun MediaTile(
             } else {
                 Icons.Outlined.Image
             },
+            priority = 32,
         )
 
         if (item.kind == DriveItemKind.VIDEO) {
