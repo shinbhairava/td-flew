@@ -19,6 +19,17 @@ data class SavedFile(
 )
 
 object FileSaver {
+    fun uriForLocalFile(context: Context, file: File): String? {
+        if (!file.isFile) return null
+        return runCatching {
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            ).toString()
+        }.getOrNull()
+    }
+
     suspend fun save(
         context: Context,
         source: File,

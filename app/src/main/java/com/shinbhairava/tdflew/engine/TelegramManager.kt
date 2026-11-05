@@ -176,7 +176,13 @@ class TelegramManager(
     private var cachedSnapshot: Pair<Long, DriveSnapshot>? = null
     private val requestedFiles = ConcurrentHashMap.newKeySet<Int>()
     private val fileWaiters = ConcurrentHashMap<Int, MutableList<CompletableDeferred<TdApi.File>>>()
-    private val uploadsByPath = ConcurrentHashMap<String, String>()
+    private data class UploadProgress(
+        val transferId: String,
+        val offset: Long,
+        val total: Long,
+    )
+
+    private val uploadsByPath = ConcurrentHashMap<String, UploadProgress>()
 
     private val sendLock = Any()
     private val sendWaiters = HashMap<Long, CompletableDeferred<TdApi.Message>>()
@@ -1035,6 +1041,7 @@ class TelegramManager(
         return try {
             val group = if (staged.size > MAX_PART_BYTES) UUID.randomUUID().toString().replace("-", "") else null
             val parts = splitForUpload(staged)
+            var uploadedOffset = 0L
             val sentMessages = parts.mapIndexed { index, part ->
                 val marker = if (group == null) {
                     DriveMetadata.withTags(DriveMetadata.encodeFile(path), tags)
@@ -1047,7 +1054,10 @@ class TelegramManager(
                     asMedia = group == null && asMedia,
                     marker = marker,
                     transferId = transferId,
+                    progressOffset = uploadedOffset,
+                    progressTotal = staged.size,
                 )
+                uploadedOffset += part.size
                 if (part.file != staged.file) part.file.delete()
                 sent
             }
@@ -1073,8 +1083,14 @@ class TelegramManager(
         asMedia: Boolean,
         marker: String,
         transferId: String,
+        progressOffset: Long,
+        progressTotal: Long,
     ): TdApi.Message {
-        uploadsByPath[staged.file.absolutePath] = transferId
+        uploadsByPath[staged.file.absolutePath] = UploadProgress(
+            transferId = transferId,
+            offset = progressOffset,
+            total = progressTotal,
+        )
         return try {
             val content = buildMessageContent(
                 staged,
@@ -1410,8 +1426,13 @@ class TelegramManager(
     }
 
     suspend fun open(item: DriveItem) {
-        val saved = download(item)
-        if (!FileSaver.open(context, saved.uri, item.mimeType)) {
+        val localPath = item.fileId?.let { _filePaths.value[it] }
+        val localUri = localPath
+            ?.let(::File)
+            ?.takeIf { it.isFile }
+            ?.let { FileSaver.uriForLocalFile(context, it) }
+        val uri = localUri ?: download(item).uri
+        if (!FileSaver.open(context, uri, item.mimeType)) {
             throw IllegalStateException("No app on this device can open this file type.")
         }
     }
@@ -1514,11 +1535,19 @@ class TelegramManager(
             file.size.coerceAtLeast(0L),
         )
 
-        val uploadId = uploadsByPath[file.local.path]
-        if (uploadId != null) {
+        val upload = uploadsByPath[file.local.path]
+            ?: uploadsByPath.entries.firstOrNull {
+                it.key == file.local.path || runCatching {
+                    File(it.key).canonicalPath == File(file.local.path).canonicalPath
+                }.getOrDefault(false)
+            }?.value
+        if (upload != null) {
             val uploaded = file.remote.uploadedSize.coerceAtLeast(0L)
-            val total = file.size.coerceAtLeast(file.remote.uploadedSize)
-            transfers.updateProgressById(uploadId, uploaded, total)
+            transfers.updateProgressById(
+                upload.transferId,
+                (upload.offset + uploaded).coerceAtMost(upload.total),
+                upload.total,
+            )
         }
     }
 

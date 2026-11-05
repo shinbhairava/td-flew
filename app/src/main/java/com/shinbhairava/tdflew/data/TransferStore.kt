@@ -119,6 +119,7 @@ class TransferStore(context: Context) {
                 }
             }
             _records.value = updated
+            persistLocked()
         }
     }
 
@@ -134,6 +135,7 @@ class TransferStore(context: Context) {
                     record
                 }
             }
+            persistLocked()
         }
     }
 

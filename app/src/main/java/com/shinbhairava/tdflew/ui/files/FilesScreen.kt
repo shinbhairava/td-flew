@@ -1,5 +1,10 @@
 package com.shinbhairava.tdflew.ui.files
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -225,7 +230,12 @@ fun FilesScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (showBars) ScreenHeader(
+            AnimatedVisibility(
+                visible = showBars,
+                enter = slideInVertically { -it } + fadeIn(),
+                exit = slideOutVertically { -it } + fadeOut(),
+            ) {
+                ScreenHeader(
                 title = if (currentPath == "/") "Files" else DriveMetadata.nameOf(currentPath),
                 subtitle = drive?.let {
                     "${it.title} · ${folders.size} folders · ${files.size} files"
@@ -288,7 +298,8 @@ fun FilesScreen(
                         }
                     }
                 },
-            )
+                )
+            }
 
             if (drive == null) {
                 EmptyState(

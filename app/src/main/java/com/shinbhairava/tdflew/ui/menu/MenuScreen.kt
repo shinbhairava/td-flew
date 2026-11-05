@@ -1,5 +1,10 @@
 package com.shinbhairava.tdflew.ui.menu
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -167,7 +172,12 @@ fun MenuScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                if (showBars) ScreenHeader(
+                AnimatedVisibility(
+                    visible = showBars,
+                    enter = slideInVertically { -it } + fadeIn(),
+                    exit = slideOutVertically { -it } + fadeOut(),
+                ) {
+                    ScreenHeader(
                     title = "Menu",
                     subtitle = profile?.username?.let { "@$it" } ?: "Telegram drive controls",
                     actions = {
@@ -175,7 +185,8 @@ fun MenuScreen(
                             Icon(Icons.Outlined.OpenInNew, contentDescription = "Open GitHub")
                         }
                     },
-                )
+                    )
+                }
             }
 
             item {
@@ -397,7 +408,7 @@ fun MenuScreen(
                         FilledTonalButton(onClick = { showTransfers = true }) {
                             Icon(Icons.Outlined.Download, contentDescription = null)
                             Spacer(Modifier.size(6.dp))
-                            Text("Download manager")
+                            Text("Manager status")
                         }
                         if (transferRecords.isNotEmpty()) {
                             OutlinedButton(
@@ -1003,7 +1014,7 @@ private fun TransferLogSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Download manager", style = MaterialTheme.typography.headlineSmall)
+                     Text("Manager status", style = MaterialTheme.typography.headlineSmall)
                     Text(
                         text = "${records.size} recent transfers",
                         style = MaterialTheme.typography.bodySmall,
