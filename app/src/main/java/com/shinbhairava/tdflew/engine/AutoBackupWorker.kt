@@ -28,6 +28,7 @@ class AutoBackupWorker(
                 val root = DocumentFile.fromTreeUri(applicationContext, android.net.Uri.parse(rawUri))
                     ?: return@forEach
                 val rootPath = DriveMetadata.childPath("/", root.name ?: "Backup") ?: "/"
+                container.telegram.ensureFolderPath(rootPath)
                 backupTree(container, root, rootPath)
             }
             Result.success()
@@ -45,6 +46,7 @@ class AutoBackupWorker(
         directory.listFiles().forEach { file ->
             if (file.isDirectory) {
                 val child = DriveMetadata.childPath(folderPath, file.name ?: "Folder") ?: return@forEach
+                container.telegram.ensureFolderPath(child)
                 backupTree(container, file, child)
             } else if (file.isFile) {
                 val modified = file.lastModified()

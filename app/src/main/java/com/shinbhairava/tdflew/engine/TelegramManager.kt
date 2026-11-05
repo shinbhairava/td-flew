@@ -920,6 +920,25 @@ class TelegramManager(
         )
     }
 
+    suspend fun ensureFolderPath(rawPath: String) {
+        val drive = _driveChat.value ?: throw IllegalStateException("Choose a Telegram drive first.")
+        val path = DriveMetadata.normalizeFolderPath(rawPath)
+            ?: throw IllegalArgumentException("That folder path is not valid.")
+        if (path == "/") return
+
+        var parent = "/"
+        val existing = snapshot(drive.id).folders.mapTo(HashSet()) { it.path }
+        path.removePrefix("/").split('/').forEach { segment ->
+            val child = DriveMetadata.childPath(parent, segment)
+                ?: throw IllegalArgumentException("That folder path is not valid.")
+            if (child !in existing) {
+                createFolder(parent, segment)
+                existing += child
+            }
+            parent = child
+        }
+    }
+
     suspend fun deleteItem(item: DriveItem): Int {
         val drive = _driveChat.value ?: throw IllegalStateException("Choose a Telegram drive first.")
         val current = snapshot(drive.id)
