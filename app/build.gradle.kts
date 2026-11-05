@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
 val telegramApiId = 12567899
 val telegramApiHash = "322ad41ebf516309ad41717ebf2e6155"
 
