@@ -959,6 +959,38 @@ class TelegramManager(
         log("Updated tags for ${item.name}")
     }
 
+    suspend fun moveItem(item: DriveItem, destinationFolder: String) {
+        val drive = _driveChat.value ?: throw IllegalStateException("Choose a Telegram drive first.")
+        val destination = DriveMetadata.normalizeFolderPath(destinationFolder)
+            ?: throw IllegalArgumentException("That destination folder is not valid.")
+        val current = snapshot(drive.id)
+        val used = current.allManagedItems.mapTo(HashSet()) { it.path } - item.path
+        val newPath = uniqueFilePath(destination, item.name, used)
+        val parts = if (item.chunkParts.isEmpty()) {
+            listOf(item.messageId to item.chunkIndex)
+        } else {
+            item.chunkParts.map { it.messageId to it.index }
+        }
+        parts.forEach { (messageId, index) ->
+            val marker = if (item.chunkGroup == null) {
+                DriveMetadata.encodeFile(newPath)
+            } else {
+                DriveMetadata.encodeChunk(newPath, item.chunkGroup, index, item.chunkTotal)
+            }
+            request<TdApi.Message>(
+                TdApi.EditMessageCaption(
+                    drive.id,
+                    messageId,
+                    null,
+                    TdApi.FormattedText(DriveMetadata.withTags(marker, item.tags), emptyArray()),
+                    false,
+                ),
+            )
+        }
+        invalidateSnapshot()
+        log("Moved ${item.name} to $destination")
+    }
+
     // ---------------------------------------------------------------------
     // Uploads
     // ---------------------------------------------------------------------
@@ -1401,6 +1433,7 @@ class TelegramManager(
         return withTimeout(FILE_TIMEOUT_MS) {
             val initial = request<TdApi.File>(TdApi.GetFile(fileId))
             if (initial.local.isDownloadingCompleted && initial.local.path.isNotBlank()) {
+                _filePaths.update { it + (fileId to initial.local.path) }
                 return@withTimeout initial
             }
 
@@ -1409,6 +1442,9 @@ class TelegramManager(
             try {
                 val current = request<TdApi.File>(TdApi.GetFile(fileId))
                 if (current.local.isDownloadingCompleted) {
+                    if (current.local.path.isNotBlank()) {
+                        _filePaths.update { it + (fileId to current.local.path) }
+                    }
                     completeFileWaiters(current)
                 } else {
                     request<TdApi.File>(

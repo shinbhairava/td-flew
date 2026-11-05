@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.FolderShared
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Refresh
@@ -73,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shinbhairava.tdflew.drive.DriveItem
@@ -107,6 +109,7 @@ fun FilesScreen(
     var descending by rememberSaveable { mutableStateOf(false) }
     var actionItem by remember { mutableStateOf<DriveItem?>(null) }
     var deleteTarget by remember { mutableStateOf<DriveItem?>(null) }
+    var moveTarget by remember { mutableStateOf<DriveItem?>(null) }
     var showCreateFolder by remember { mutableStateOf(false) }
     var folderName by remember { mutableStateOf("") }
     var folderError by remember { mutableStateOf<String?>(null) }
@@ -433,6 +436,14 @@ fun FilesScreen(
                         },
                     )
                     SheetAction(
+                        icon = Icons.Outlined.FolderShared,
+                        label = "Move to folder",
+                        onClick = {
+                            actionItem = null
+                            moveTarget = item
+                        },
+                    )
+                    SheetAction(
                         icon = Icons.Outlined.DeleteOutline,
                         label = "Delete from Telegram",
                         destructive = true,
@@ -444,6 +455,53 @@ fun FilesScreen(
                 }
             }
         }
+    }
+
+    moveTarget?.let { item ->
+        AlertDialog(
+            onDismissRequest = { moveTarget = null },
+            icon = { Icon(Icons.Outlined.FolderShared, contentDescription = null) },
+            title = { Text("Move ${item.name}") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    TextButton(
+                        onClick = {
+                            moveTarget = null
+                            runAction("Moving") {
+                                manager.moveItem(item, "/")
+                                refreshToken += 1
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Root /", textAlign = TextAlign.Start) }
+                    snapshot?.folders.orEmpty()
+                        .filter { it.path != item.path && !it.path.startsWith("${item.path}/") }
+                        .sortedBy { it.path }
+                        .forEach { folder ->
+                            TextButton(
+                                onClick = {
+                                    moveTarget = null
+                                    runAction("Moving") {
+                                        manager.moveItem(item, folder.path)
+                                        refreshToken += 1
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(folder.path, textAlign = TextAlign.Start)
+                            }
+                        }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { moveTarget = null }) { Text("Cancel") } },
+        )
     }
 
     if (showCreateFolder) {

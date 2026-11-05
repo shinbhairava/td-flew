@@ -462,7 +462,7 @@ private fun SearchAndFilters(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            placeholder = { Text("Search name or date: 2026-11-04") },
+            placeholder = { Text("Search") },
             leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
             trailingIcon = {
                 if (search.isNotBlank()) {
